@@ -1,0 +1,33 @@
+/*
+ * A short list of facts: a name on the left, a value on the right, the value being
+ * something a person would copy rather than read. The About window's git version and
+ * path, and the command log's repository and exit code, are the same list drawn twice.
+ *
+ * Imported with `<style scoped src="@renderer/styles/factList.css">` above the
+ * component's own scoped block; see `listRow.css` for why that works.
+ *
+ * Not for every `<dl>` in the app: `CommitDetails` and the lost-object preview draw a
+ * commit's metadata, which is prose in a grid rather than a value to copy, and both keep
+ * their own. Same element, different thing.
+ */
+
+dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+}
+
+dt {
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+
+/* The value, in the font it would be typed in: a path or a version is read character by
+   character, and `break-all` is what keeps a long one inside the window. */
+dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  word-break: break-all;
+}

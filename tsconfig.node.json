@@ -1,0 +1,40 @@
+{
+  "include": [
+    "electron.vite.config.ts",
+    "main/**/*",
+    "shared/**/*",
+    "tests/**/*",
+    "e2e/**/*",
+    "playwright.config.ts",
+    "renderer/**/*",
+    "renderer/**/*.vue"
+  ],
+  "compilerOptions": {
+    "composite": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node", "vite/client"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["shared/*"],
+      "@main/*": ["main/*"],
+      // Tests live under this config, and a few renderer modules are pure enough to
+      // unit-test under Node: the selection store, the formatters. Anything reaching
+      // for `window` still cannot be, which the missing DOM lib here enforces.
+      "@renderer/*": ["renderer/*"]
+    }
+  }
+}

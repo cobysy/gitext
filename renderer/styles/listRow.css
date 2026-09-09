@@ -1,0 +1,56 @@
+/*
+ * Shared interaction states for the app's list-of-rows components: the revision grid,
+ * the left panel, and the staged/changed file lists. Each of those lays out its own
+ * `.row`, different height, different columns, but hovering and selecting a row mean
+ * the same thing everywhere, and until this file existed that meaning was written out
+ * fresh in each component.
+ *
+ * Imported with `<style scoped src="@renderer/styles/listRow.css">`, so Vue compiles it
+ * with the importing component's own scope hash: it behaves exactly like a second
+ * scoped `<style>` block, just without the copy-paste. Put the import ahead of the
+ * component's own scoped block so anything the component adds afterward (RevisionGrid's
+ * `color: inherit` on hover, say) wins the cascade at equal specificity.
+ *
+ * Beyond the two interaction states: the parts of a row every one of these lists draws
+ * the same way. A folder row is quieter than a file and folds when clicked; the
+ * directory in front of a file name is quieter still; and a virtualized list's sizer is
+ * the box its absolutely-placed rows are measured against.
+ *
+ * What's deliberately NOT here: the `.primary` accent bar. StagingList and ChangedFiles
+ * light it from `.row.primary` alone; RevisionGrid requires `.row.selected.primary`
+ * because its multi-select can carry a primary row that has scrolled out of the
+ * selection highlight. Same declaration, different trigger: that's a per-component
+ * decision, not a duplicate.
+ */
+
+.row:hover {
+  background: var(--bg-hover);
+}
+
+.row.selected {
+  background: var(--bg-selected);
+}
+
+/* A folder row: not a thing in the repository, so it reads as the heading it is, and
+   the pointer says the click folds it rather than picking a file. */
+.row.folder {
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+/* Picked, it is an operand like any other row, so it comes back to full strength. */
+.row.folder.selected {
+  color: var(--fg);
+}
+
+/* The directory in front of a file's name: there to place the file, not to be read. */
+.dir {
+  color: var(--fg-subtle);
+}
+
+/* What a virtualized list scrolls: as tall as every row, with the drawn few placed
+   absolutely inside it. */
+.sizer {
+  position: relative;
+  width: 100%;
+}

@@ -1,0 +1,25 @@
+/*
+ * The strip across the top of a content pane: the diff viewer's, the blob viewer's, the
+ * file list's, and the command log panel's. It holds whatever that pane needs to say
+ * about itself (a path, a count) and the controls that act on it, and it looks the same
+ * everywhere because it is the same thing everywhere.
+ *
+ * Imported with `<style scoped src="@renderer/styles/paneBar.css">`, so Vue compiles it
+ * with the importing component's own scope hash: see `listRow.css` for the same trick.
+ * Put it above the component's own scoped block so what the component adds afterward
+ * wins the cascade at equal specificity.
+ *
+ * Not for every `.bar` in the app: `StatusBar` and `CommitDetails` have one too, but
+ * theirs are a window-wide footer and a header with a fixed height and their own colour.
+ * Same word, different thing: so they keep their own rule.
+ */
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-subtle);
+  flex: none;
+}

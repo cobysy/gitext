@@ -1,0 +1,316 @@
+@import './tokens.css';
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app,
+/* The dialog windows' mount point: a dialog fills its window the way the app fills
+   its own, so its footer sits on the bottom edge rather than under its content. */
+#dialog {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  color: var(--fg);
+  background: var(--bg);
+  /* A desktop app should not feel like a web page. */
+  user-select: none;
+  cursor: default;
+  overflow: hidden;
+}
+
+/* A dialog window's page *is* the dialog surface: see `renderer/dialog.ts`. */
+body.dialog-window {
+  background: var(--bg-overlay);
+}
+
+/* Opt back in wherever content is genuinely text. */
+.selectable,
+input,
+textarea,
+pre,
+/*
+ * A git token in running text: a flag, a command, a branch name, a path.
+ *
+ * The font is what does the work. `--no-ff` set in the prose face reads as a word with
+ * two hyphens stuck to it, and a branch called `fix` is indistinguishable from the word.
+ * Slightly smaller than the text around it because the mono face runs wide, and on a
+ * tinted ground so a name with a space in it still reads as one token.
+ */
+code {
+  user-select: text;
+  cursor: auto;
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  /* Brighter than the muted prose it sits in: the font separates it, the colour says it
+     is the part that matters. */
+  color: var(--fg);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-3);
+  cursor: default;
+}
+
+button:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+/* A grey button at half opacity reads as off. A saturated one does not: `.primary` and
+   `.danger` stay confidently blue and red, so opacity alone leaves the two buttons whose
+   state matters most looking pressable. Those two desaturate instead, below. */
+button:disabled {
+  opacity: 0.5;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--fg-on-accent);
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+/* Disabled means "this cannot run", and it has to survive the accent colour. Dropping to
+   the ordinary button surface says it plainly; the shared `opacity` above then softens
+   the label the same way it does everywhere else. */
+button.primary:disabled,
+button.danger:disabled {
+  background: var(--bg-raised);
+  border-color: var(--border);
+  color: var(--fg);
+}
+
+/* The confirming button of a dialog that discards work. Here rather than in each
+   dialog's own scoped styles: it is the same button everywhere, and `DialogHost` finds
+   it by this class when Enter presses a dialog's primary action. */
+button.danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--fg-on-accent);
+}
+
+button.danger:hover:not(:disabled) {
+  filter: brightness(0.92);
+}
+
+/* A destructive action that is not the dialog's primary: red for what it does, no fill,
+   because the filled red belongs to the button the dialog is *for*. One class, so
+   "delete a worktree" and "delete a remote branch" stop being three different colours. */
+button.del {
+  background: var(--bg-raised);
+  border-color: var(--border);
+  color: var(--danger);
+}
+
+button.del:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+button.del:disabled {
+  color: var(--fg);
+}
+
+/*
+ * A footer button is never narrower than this.
+ *
+ * Width was pure text length, so every Cancel/Confirm pair came out lopsided: "Go" beside
+ * "Cancel", "Save & Mark Resolved" dwarfing it. A floor makes the pairs read as a pair
+ * without stretching the long labels.
+ */
+.actions button,
+.footer button,
+footer button {
+  min-width: 84px;
+}
+
+/* `select` is here with the text fields rather than in `FormSelect`, where it was: the
+   app has selects outside that component (the commit picker's ref shortcuts, for one) and
+   they were left with the UA's own chrome: a white control in a dark window. A closed
+   `<select>` is a box with a border and a value in it, exactly like an `<input>`, so it
+   is the same declaration; the popup it opens is the platform's and follows
+   `color-scheme` from `tokens.css`. */
+input[type='text'],
+input[type='search'],
+input[type='number'],
+select,
+textarea {
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+}
+
+select:disabled,
+input:disabled,
+textarea:disabled {
+  opacity: 0.5;
+}
+
+/* Links are the app's accent, not the browser's blue, and are not underlined until
+   pointed at: every link here sits inside running prose (a dialog's "what this flag
+   does", the About window's credits) where a permanent underline reads as emphasis on a
+   sentence rather than as something to click.
+   Every one of them opens in the real browser: `setWindowOpenHandler` in `main/index.ts`
+   and `main/dialogs.ts` denies the navigation and hands the URL to the OS, so a link can
+   never replace a window with a web page nobody can get back from. */
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
+/* No focus rings, anywhere, on anything.
+   Not on buttons, not on checkboxes or radios, and not behind `:focus-visible` either:
+   "only when the keyboard did it" is still a box drawn around a control. A pane says
+   where the keyboard is with its selection, a text field with its caret, and a select
+   with the value showing in its closed control; that is the whole affordance this app
+   uses. `:focus` as well as `:focus-visible`, because the UA draws its own ring on the
+   first and suppressing only the second leaves it. One blanket rule so nothing new has
+   to remember, and so nothing can put one back a component at a time. */
+*:focus,
+*:focus-visible {
+  outline: none;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fg-subtle);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-corner,
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* One line of text that gives way to an ellipsis rather than wrapping or overflowing.
+   Copied as the same three declarations into two dozen components before this existed;
+   add it as a class on the element (alongside whatever class already styles it) instead
+   of writing the three lines out again. Needs `min-width: 0` from a flex/grid ancestor
+   to actually shrink: this class doesn't supply that, since how the element is laid
+   out is the caller's decision, not the truncation's. */
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The line of explanation under a form control: what a flag does, what a mode means.
+   `FormRow`, `FormCheck`, and `FormRadioGroup` each defined this identically: the
+   drift `FormRow.vue`'s own doc comment was written to warn about, one level down from
+   where it was fixed. `margin: 0` is for the dialogs that put it on a `<p>` rather than
+   a `<span>`; it's a no-op on the inline case. Not for every `.hint` in the app:
+   `SettingsDialog` styles its own denser, more numerous hints on purpose. */
+.hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  line-height: 1.4;
+}
+
+/* A dialog's vertical stack of rows. The rows themselves are `FormRow` and friends;
+   this is only the rhythm between them, which is why it stays a class rather than
+   becoming another component. Was written out identically in 21 dialogs. */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* A form whose body is meant to take the window rather than stack to its content: a
+   dialog that is mostly an editor. Two of them had written the whole of `.form` out
+   again under another name to add these two lines. */
+.form.fills {
+  height: 100%;
+  min-height: 0;
+}
+
+/* A dialog's paragraphs sit in the form's own gap; the browser's default margin would
+   add a second, uneven one. Saves every dialog a `p { margin: 0 }` of its own. */
+.form > p {
+  margin: 0;
+}
+
+/* The one-line outcome under a form, in the four flavours the dialogs actually use.
+   `.error` alone was written out identically in 21 of them. Kept as one family so the
+   next one to need "say this went well" has an obvious answer that matches the rest;
+   a component wanting it denser (`CommitDetails`) overrides from its own scoped block,
+   which wins on specificity. */
+.error,
+.warn,
+.success {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.error {
+  color: var(--danger);
+}
+
+.warn {
+  color: var(--warning);
+}
+
+.success {
+  color: var(--success);
+}
+
+/* The empty element in a flex row that pushes everything after it to the far end: a
+   pane header's title on the left, its buttons on the right. Ten components had this
+   one declaration of their own, four of them calling it `.grow` and six `.spacer`,
+   which is how a component ends up with both. It takes no space of its own, so it is
+   the same class wherever the row is going. */
+.spacer {
+  flex: 1;
+}
+
+/* A line standing in for content that is not there: "Select a commit", "No differences",
+   "This file is empty". Written out identically in four panes before this.
+   Deliberately NOT called `.note`: that name is already a git note in `CommitDetails`
+   and a callout box in `DangerNote`, and a third meaning on a global class would reach
+   both of them. `.error` on top of it recolours without repeating the layout. */
+.placeholder {
+  margin: 0;
+  padding: var(--space-3);
+  color: var(--fg-subtle);
+  font-size: var(--text-sm);
+}
+
+/* A placeholder that is bad news: "could not read this file". `.error` on its own loses
+   to `.placeholder` here, same specificity and later in the file, so the pane would say
+   its worst news in the quietest colour. Two panes wrote this pair out to get around
+   that; it belongs with the two classes it reconciles. */
+.placeholder.error {
+  color: var(--danger);
+}

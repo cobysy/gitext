@@ -1,0 +1,112 @@
+/*
+ * The dialogs that manage a collection rather than run a command: remotes and stashes.
+ * Each is a reset `<ul>` of rows, each row ending in its own buttons, and one of those
+ * buttons usually removes the thing. `ResolveConflictsDialog` used to be a third: its
+ * rows are now `FileRow`s drawn the way `StagingList` draws its own (`renderer/
+ * filetree.ts`, `listRow.css`), since a conflicted file is something you pick and act
+ * on in bulk alongside every other file list in the app, not a row with its own fixed
+ * set of buttons: so it no longer pulls in anything from this file.
+ *
+ * Imported with `<style scoped src="@renderer/styles/manageList.css">` above the
+ * component's own scoped block; see `listRow.css` for why that works.
+ *
+ * `.list` and `.actions` are deliberately NOT global classes: `CommandLogPanel` and
+ * `ChangedFiles` both own a `.list` that is a scrollable pane, and `DialogFrame` owns
+ * the `.actions` in a dialog footer. Same words, different things: so this stays a
+ * partial that only a handful of dialogs pull in.
+ *
+ * `.del` is the quiet counterpart to `button.danger` in `global.css`: that one is a
+ * dialog's primary destructive action and is filled; this is one row's, and stays an
+ * outline until you are actually on it.
+ */
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/*
+ * `.list.side`: the master column of a list-and-pane dialog (remotes, worktrees,
+ * submodules), as opposed to the loose stacks the other two dialogs use.
+ *
+ * One box with hairlines between its rows. Not a column of separately bordered cards with
+ * air between them: rows carrying their own border and gap read as a set of independent
+ * things that each happen to be clickable. A list of remotes is one control you pick a row
+ * out of.
+ *
+ * The box owns the border, the rounding and the scroll. A row owns nothing but the
+ * hairline above it.
+ */
+.list.side {
+  gap: 0;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  overflow-y: auto;
+}
+
+/* On the `<li>` rather than on the row inside it, so a group heading, which is an `<li>`
+   and not a button, is separated from the rows above it by the same line. */
+.list.side > li + li {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.actions {
+  flex: none;
+  display: flex;
+  gap: var(--space-1);
+}
+
+/*
+ * A selectable row in one of those master lists: a `<button class="entry">` per row,
+ * `.current` on whichever one is selected.
+ *
+ * Flush to the box on every side: the row is a band across the list, so its hover and
+ * selected tints run edge to edge the way a list view's do, and nothing about the row
+ * competes with the border that says where the list is.
+ */
+.entry {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: var(--space-2);
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 0;
+}
+
+.entry:hover {
+  background: var(--bg-hover);
+}
+
+.entry.current {
+  background: var(--bg-selected);
+}
+
+.entry .title {
+  font-size: var(--text-sm);
+  max-width: 100%;
+}
+
+.entry .detail {
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+  max-width: 100%;
+}
+
+.del {
+  color: var(--danger);
+}
+
+.del:hover {
+  background: var(--danger);
+  color: var(--fg-on-accent);
+  border-color: var(--danger);
+}

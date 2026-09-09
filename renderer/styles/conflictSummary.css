@@ -1,0 +1,22 @@
+/*
+ * The line at the top of a conflict window saying how much is left: a number, then what
+ * it counts. Both windows draw it, the list of conflicted files and the editor for one
+ * of them, and the number is the thing you look at, so it is bold and in the danger
+ * colour whether it is forty files or one block.
+ *
+ * Imported with `<style scoped src="@renderer/styles/conflictSummary.css">` above the
+ * component's own scoped block; see `listRow.css` for why that works.
+ *
+ * The sentence around the number stays with each window: one ends in a full stop and
+ * the other in a colon, because only one of them has a legend to introduce.
+ */
+
+.summary {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.summary .count {
+  font-weight: 700;
+  color: var(--danger);
+}

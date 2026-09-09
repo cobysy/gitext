@@ -1,0 +1,61 @@
+/*
+ * A dialog in two columns: a list on the left that picks the operand, a pane on the
+ * right that acts on whatever is picked. Remotes, submodules, worktrees, `fsck`'s lost
+ * objects, and a patch's files are all that shape, and all five had written the same
+ * three rules out under five different names for the wrapper.
+ *
+ * Imported with `<style scoped src="@renderer/styles/splitDialog.css">` above the
+ * component's own scoped block; see `listRow.css` for why that works.
+ *
+ * What stays with the component: how tall the split is (four of them fill the dialog,
+ * one takes what the row above it leaves), how wide its list column is, and anything
+ * the pane holds. Those differ per dialog and are the reason to open one rather than
+ * another.
+ *
+ * `.list.side` is `manageList.css`': the master column is that list, and a dialog using
+ * this file usually imports both.
+ */
+
+.split {
+  display: flex;
+  gap: var(--space-3);
+  align-items: stretch;
+  /* Without this the columns refuse to shrink below their content and the dialog scrolls. */
+  min-height: 0;
+  /* Fills the dialog, which is what four of the five want. The one that sits under a
+     row of its own overrides this with `height: auto`. */
+  height: 100%;
+}
+
+/* The right-hand column: everything the picked row's own controls sit in. */
+.detail-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Tighter, and shrinking to the height it is given: for a pane that stacks a bar and a
+   viewer rather than a form, where the form's own rhythm would be air it cannot spare. */
+.detail-pane.dense {
+  gap: var(--space-2);
+  min-height: 0;
+}
+
+/*
+ * The left-hand column when it is more than the list alone: options above it, or a
+ * count below. The list inside takes what they leave.
+ */
+.side-column {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+}
+
+.side-column .list.side {
+  flex: 1;
+  min-height: 0;
+}

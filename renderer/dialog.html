@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Same CSP as the repository window: sandboxed, no Node, and no remote load, so a
+      branch name or a commit message rendered in a dialog cannot pull in outside code.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self' 'unsafe-eval'; worker-src blob: 'self';"
+    />
+    <!-- Replaced from the route table once the dialog knows which one it is. -->
+    <title>gitext</title>
+  </head>
+  <body>
+    <div id="dialog"></div>
+    <script type="module" src="./dialog.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,214 @@
+/*
+ * Design tokens.
+ *
+ * Two themes only: light and dark. Every colour in the app resolves through a
+ * variable declared here; component styles never hard-code a hex value.
+ *
+ * `[data-theme]` on <html> is set from the effective OS/user theme by App.vue.
+ */
+
+:root {
+  /* Type */
+  --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-md: 13px;
+  --text-lg: 15px;
+
+  /* Space */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+}
+
+:root,
+:root[data-theme='light'] {
+  /*
+   * The one property that tells the UA which way round its *own* widgets go.
+   *
+   * A checkbox, a radio and a `<select>`'s popup list are drawn by the platform, not by
+   * this stylesheet: there is no CSS box to paint. Without this they stay in their light
+   * form on top of a dark app: a white tick-box, a white radio, and a white menu dropping
+   * out of a dark control. Setting it per theme is the whole fix, and it is why no
+   * component needs a rule for any of the three.
+   *
+   * `accent-color` is the other half: it recolours the *checked* state of a checkbox and
+   * radio, which is otherwise the OS's blue whatever the app's accent is.
+   */
+  color-scheme: light;
+  accent-color: var(--accent);
+
+  --bg: #ffffff;
+  --bg-subtle: #f6f7f9;
+  --bg-raised: #ffffff;
+  --bg-overlay: #ffffff;
+  --bg-hover: rgba(0, 0, 0, 0.045);
+  --bg-active: rgba(0, 0, 0, 0.075);
+  --bg-selected: #dbeafe;
+  /* The characters a search matched, inside a line of text. Its own token rather than
+     `--bg-selected` because the two appear together in the results list: the matched
+     span sits inside a row that may itself be hovered or selected, and one colour doing
+     both jobs makes a selected row's highlight disappear into it. */
+  --bg-match: #fff2a8;
+
+  --fg: #1f2328;
+  --fg-muted: #656d76;
+  --fg-subtle: #8c959f;
+  --fg-on-accent: #ffffff;
+
+  --border: #d8dee4;
+  --border-subtle: #eaeef2;
+
+  --accent: #0969da;
+  --accent-hover: #0860c4;
+
+  --success: #1a7f37;
+  --warning: #9a6700;
+  --danger: #cf222e;
+
+  /* Ref-badge colours, by kind. Branch reuses --success; remote and tag are their
+     own hues so they read distinctly from --danger and --accent respectively. */
+  --ref-branch: var(--success);
+  --ref-remote: #be123c;
+  --ref-tag: #3730a3;
+
+  --diff-add-bg: #e6ffec;
+  --diff-del-bg: #ffebe9;
+  /* A line that was replaced rather than added or removed. Its own hue, because in a
+     two-pane comparison it is the third kind of difference and not half of two others:
+     the same text is on both sides, and what matters is that it moved. */
+  --diff-mod-bg: #ddf4ff;
+  /* The characters that actually changed within a replaced line, over the row's own
+     tint: so the line still reads as added or deleted at a glance. */
+  --diff-add-strong: #abf2bc;
+  --diff-del-strong: #ffc1bc;
+  --diff-mod-strong: #b6e3ff;
+  /* Where one side has no line at all opposite the other. Not a colour of change:
+     nothing is there: so it is drawn as absence: a flat panel with a faint hatch over
+     it, which reads as "no line here" where a plain fill reads as a very dark line. */
+  --diff-filler-bg: #f0f2f5;
+  --diff-filler-line: #dfe3e8;
+  /* The bars: the connector between the panes, and the marks on the overview strip. */
+  --diff-add-bar: #57ab5a;
+  --diff-del-bar: #e5534b;
+  --diff-mod-bar: #4c9aff;
+
+  /* The sides of a conflict block, in the merge editor's gutter and behind its lines.
+     Their own tokens rather than aliases of the diff ones: a diff colour says added or
+     removed, and both sides of a conflict are additions: reusing them would colour the
+     two sides the same. `bg` tints the line, `bar` is the strip down the gutter. The
+     markers get the loudest of the four because they are scaffolding to be removed, not
+     a side to choose. */
+  --conflict-ours-bg: #e6ffec;
+  --conflict-ours-bar: #57ab5a;
+  --conflict-theirs-bg: #ddf4ff;
+  --conflict-theirs-bar: #4c9aff;
+  --conflict-base-bg: #f2f4f7;
+  --conflict-base-bar: #8c959f;
+  --conflict-marker-bg: #fff1e5;
+  --conflict-marker-bar: #bc4c00;
+
+  --shadow-overlay: 0 8px 24px rgba(31, 35, 40, 0.16);
+  /* Behind a palette or a scrim-mounted dialog. The same value in both themes on
+     purpose: it darkens whatever is under it rather than tinting toward a theme. */
+  --scrim: rgba(0, 0, 0, 0.35);
+  --graph-dim: #b8bfc7;
+
+  /*
+   * Lane colours, carried over with the graph layout: light theme here, dark below.
+   *
+   * **Seven, not eight.** The count is not cosmetic. `getColorForLane` is `seed % count`,
+   * so an eighth entry gives the same history a different colouring.
+   *
+   * A palette picked purely for separation would beat these on that metric. Matching the
+   * layout that assigns the indices is worth more. The separation work is not lost:
+   * `laneInfo.ts`'s `getColor` still refuses to seat a colour beside itself, and that veto
+   * carries the load at seven hues.
+   *
+   * Read by index, `--graph-{color % 7}`, from `GraphCanvas.vue`. The graph's
+   * *geometry* is deliberately not here: lane width and row height are TypeScript
+   * constants, because the canvas and the virtualizer do arithmetic with them and a
+   * CSS string would have to be parsed back into a number on every frame.
+   */
+  --graph-0: #f064a0; /* pink   */
+  --graph-1: #78b4e6; /* blue   */
+  --graph-2: #24c221; /* green  */
+  --graph-3: #a078f0; /* purple */
+  --graph-4: #dd3228; /* red    */
+  --graph-5: #1ac6a6; /* teal   */
+  --graph-6: #e7b00f; /* yellow */
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #1e2127;
+  --bg-subtle: #191c21;
+  --bg-raised: #23272e;
+  --bg-overlay: #2a2f37;
+  --bg-hover: rgba(255, 255, 255, 0.055);
+  --bg-active: rgba(255, 255, 255, 0.09);
+  --bg-selected: #1f3a5f;
+  /* Dark's match highlight is a dim amber rather than light's pale yellow: the text drawn
+     over it is `--fg`, so the fill has to stay well under it. */
+  --bg-match: #6b5410;
+
+  --fg: #d5dae1;
+  --fg-muted: #8b949e;
+  --fg-subtle: #6e7681;
+  --fg-on-accent: #ffffff;
+
+  --border: #3a4048;
+  --border-subtle: #2b3038;
+
+  --accent: #4c9aff;
+  --accent-hover: #6aabff;
+
+  --success: #3fb950;
+  --warning: #d29922;
+  --danger: #f85149;
+
+  --ref-branch: var(--success);
+  --ref-remote: #fb7185;
+  --ref-tag: #818cf8;
+
+  --diff-add-bg: #12261e;
+  --diff-del-bg: #2d1517;
+  --diff-mod-bg: #13253c;
+  --diff-add-strong: #1f5233;
+  --diff-del-strong: #6b2229;
+  --diff-mod-strong: #1f4b7a;
+  --diff-filler-bg: #16181d;
+  --diff-filler-line: #23262d;
+  --diff-add-bar: #3fb950;
+  --diff-del-bar: #f85149;
+  --diff-mod-bar: #4c9aff;
+
+  --conflict-ours-bg: #12261e;
+  --conflict-ours-bar: #3fb950;
+  --conflict-theirs-bg: #13253c;
+  --conflict-theirs-bar: #4c9aff;
+  --conflict-base-bg: #23262d;
+  --conflict-base-bar: #6e7681;
+  --conflict-marker-bg: #2f1e12;
+  --conflict-marker-bar: #db6d28;
+
+  --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --scrim: rgba(0, 0, 0, 0.35);
+  --graph-dim: #4b525b;
+
+  /* The same seven hues, darkened for the dark theme. */
+  --graph-0: #db5b93; /* pink   */
+  --graph-1: #6fa7d4; /* blue   */
+  --graph-2: #1da31b; /* green  */
+  --graph-3: #8a67cf; /* purple */
+  --graph-4: #c02a22; /* red    */
+  --graph-5: #17aa8f; /* teal   */
+  --graph-6: #ca9b0d; /* yellow */
+}

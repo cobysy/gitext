@@ -1,0 +1,72 @@
+{
+  "name": "gitext",
+  "version": "0.0.1",
+  "description": "A Git GUI, Electron + Vue 3, git CLI only",
+  "license": "MIT",
+  "private": true,
+  "main": "out/main/index.js",
+  "build": {
+    "productName": "gitext",
+    "files": [
+      "out/**/*",
+      "!out/renderer/assets/*.worker-*.js.map",
+      "!out/renderer/assets/monacoLang-*.js.map",
+      "package.json"
+    ]
+  },
+  "scripts": {
+    "dev": "node scripts/ensure-electron-runtime.mjs && electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "dist": "npm run build && electron-builder",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && vue-tsc --noEmit -p tsconfig.node.json",
+    "eslint": "eslint . --ext .js,.cjs,.mjs,.ts,.mts,.cts,.vue",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:commit": "playwright test e2e/commit-screen.spec.ts",
+    "test:e2e:dialogs": "playwright test e2e/dialogs-branches.spec.ts e2e/dialogs-worktree.spec.ts e2e/dialogs-history.spec.ts",
+    "test:e2e:conflicts": "playwright test e2e/conflicts.spec.ts",
+    "fixture:commit": "node scripts/make-commit-fixture.mjs",
+    "fixture:automerge": "node scripts/make-automerge-fixture.mjs",
+    "profile": "node scripts/profile.mjs"
+  },
+  "dependencies": {
+    "@tanstack/vue-virtual": "^3.13.12",
+    "chokidar": "^4.0.3",
+    "monaco-editor": "^0.53.0",
+    "pinia": "^3.0.3",
+    "vue": "^3.5.22"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@playwright/test": "^1.63.0",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@types/node": "^24.7.0",
+    "@vitejs/plugin-vue": "^6.0.1",
+    "@vue/test-utils": "^2.4.11",
+    "electron": "^43.3.0",
+    "electron-builder": "^26.0.12",
+    "electron-vite": "^4.0.1",
+    "eslint": "^9.17.0",
+    "eslint-plugin-vue": "^10.10.0",
+    "globals": "^15.14.0",
+    "happy-dom": "^20.11.6",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.16.0",
+    "vite": "^7.1.9",
+    "vitest": "^3.2.4",
+    "vue-eslint-parser": "^10.4.1",
+    "vue-tsc": "^3.1.1"
+  },
+  "allowScripts": {
+    "electron@43.3.0": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.1": true,
+    "fsevents@2.3.3": true,
+    "electron-winstaller@5.4.0": true,
+    "@playwright/test@1.63.0": false,
+    "playwright@1.63.0": false,
+    "playwright-core@1.63.0": false
+  }
+}

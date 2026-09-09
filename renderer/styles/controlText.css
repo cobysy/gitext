@@ -1,0 +1,36 @@
+/*
+ * A control's label and the line that explains it: `FormCheck`'s and `FormRadioGroup`'s
+ * option, which wrote this identically.
+ *
+ * **Beside the label while there is room for it, under the label when there is not**, which
+ * is one `flex-wrap` doing both: a flex item that does not fit at its natural width takes
+ * a line of its own, so a short hint (`--no-ff`, `stash push -u`) rides along and a
+ * sentence drops below and wraps there, exactly as it always did.
+ *
+ * The height that buys back is the reason. A form is as tall as its rows, a window can
+ * only be as tall as the display, and a group of five options each spending two lines on
+ * one is most of a screen: the reset modes were 381px of a 624px dialog. The room beside
+ * them is free, and free is the axis to spend.
+ *
+ * Imported with `<style scoped src="@renderer/styles/controlText.css">` above the
+ * component's own scoped block; see `listRow.css` for why that works.
+ */
+
+.text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-2);
+  row-gap: 2px;
+  /* Deliberately no `min-width` on the hint itself: it may wrap *internally* once it has
+     a line, but it must never be squeezed into a narrow column beside the label. */
+  min-width: 0;
+}
+
+/* A measure, because the windows that gained width gained it for rows and not for prose:
+   a sentence set across 900px is one the eye loses its place in. It also decides where a
+   hint goes: a wrapped item is laid out at this width, so one that would have run the
+   whole window sits beside its label on two lines instead of below it on one. */
+.text .hint {
+  max-width: 80ch;
+}

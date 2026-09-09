@@ -1,0 +1,38 @@
+/*
+ * The element a Monaco editor is mounted into, and the box it fills.
+ *
+ * Monaco lays itself out from the size it is told, not from its container, so every
+ * pane that holds one gives it a box with a definite size and then puts the editor over
+ * it absolutely. Four panes had written that out: the diff viewer, the file-history
+ * window, the commit message box and the patch reader.
+ *
+ * Imported with `<style scoped src="@renderer/styles/monacoHost.css">` above the
+ * component's own scoped block; see `listRow.css` for why that works.
+ *
+ * `fill` is a modifier rather than the default on `.monaco`, because one of the four
+ * does not fill anything: `ViewPatchDialog`'s editor is a flex child with a border of
+ * its own, and it wants only the `blank` rule below.
+ */
+
+.monaco-host {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+.monaco.fill {
+  position: absolute;
+  inset: 0;
+}
+
+/*
+ * Mounted but showing nothing. Hidden by opacity rather than by `v-if` or `display`:
+ * the editor is built in `onMounted` and an element that was never in the DOM never
+ * gets one, and Monaco measures to zero if it is laid out while hidden. So the pane
+ * that is not in front stays exactly where it is, and stops taking clicks.
+ */
+.monaco.blank {
+  opacity: 0;
+  pointer-events: none;
+}

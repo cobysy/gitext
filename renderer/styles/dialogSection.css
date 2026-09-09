@@ -1,0 +1,30 @@
+/*
+ * The heading of a titled block of settings: the shortcut reference's groups, and the
+ * name of the settings page you are on. Neither is a form with a confirming action, and
+ * both drew that heading identically.
+ *
+ * Imported with `<style scoped src="@renderer/styles/dialogSection.css">` above the
+ * component's own scoped block; see `listRow.css` for why that works.
+ *
+ * Not `FormGroup`: that draws a bordered `<fieldset>` around controls that only mean
+ * something together. These are page sections, and boxing every one of them would read
+ * as eight unrelated panels rather than one settings page.
+ */
+
+.group {
+  margin-bottom: var(--space-4);
+}
+
+/* No trailing gap above the footer. */
+.group:last-of-type {
+  margin-bottom: 0;
+}
+
+h3 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}

@@ -1,0 +1,18 @@
+# Source is source, whatever byte wandered into it.
+#
+# git decides "binary" by looking for a NUL in the first few kilobytes, and one stray
+# control character in a string literal is enough to make a whole file undiffable:
+# `Binary files differ`, no lines, nothing to review, and nothing the diff viewer can
+# draw. That happened here (a raw NUL in a template literal in renderer/stores/staging.ts,
+# commit d85afc6) and the commit is on main for good; the attribute is what makes those
+# diffs readable again, retroactively and everywhere, including plain `git diff`.
+#
+# `diff` only, deliberately: `text` would renormalize line endings across the whole
+# repository on the next checkout, which is a much larger change than this is.
+*.ts    diff
+*.mjs   diff
+*.vue   diff
+*.css   diff
+*.html  diff
+*.json  diff
+*.md    diff
