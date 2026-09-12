@@ -6,7 +6,19 @@
 
 ## Status
 
-**Nothing in flight.** The last piece of work was the revision graph.
+**Nothing in flight.** The last piece of work was the left panel's collapse control.
+
+A `‹` in the panel's filter strip, a 28px rail at the window's edge when it is hidden:
+`PanelToggleButton` in both, running `view.toggleLeftPanel` rather than patching the
+setting. The rail also carries the panel's sections (`SECTION_KINDS`); clicking one
+expands it, selects it and shows the panel, which has to appear *already* looking at it,
+so `usePanelActivation` reveals the selection on mount as well as on change. Each rail
+button names itself on hover (`renderer/styles/hoverLabel.css`), since a `title` is too
+slow to read a column of glyphs by.
+
+`npm run fixture:demo` builds `harbour`, the repository the README is shot on.
+
+Before that, the revision graph.
 
 What it is, in two rules that pull against each other:
 

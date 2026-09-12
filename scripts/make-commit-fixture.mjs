@@ -20,7 +20,7 @@
  * Usage:
  *   npm run fixture:commit -- [--path <dir>] [--conflict] [--big] [--force]
  *
- *   --path <dir>  where to build it (default: ../gitext-demo beside this repo)
+ *   --path <dir>  where to build it (default: ../gitext-commit-fixture beside this repo)
  *   --conflict    leave a merge in progress with conflicts, to exercise the conflicts
  *                 button and the resolve dialog
  *   --big         add 300 generated files, to see the lists and the filter under load

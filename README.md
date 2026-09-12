@@ -53,6 +53,7 @@ npm test           # unit + integration tests, driving real git
 npm run test:e2e   # the built app, driven under Playwright
 npm run typecheck  # tsc + vue-tsc
 npm run dist       # package an installer
+npm run fixture:demo  # build the repository these screenshots are taken on
 ```
 
 ## Status

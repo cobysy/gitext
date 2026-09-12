@@ -16,6 +16,7 @@ import { TOAST_TONE_INFO, useUiStore } from '@renderer/stores/ui.js';
 import ContextMenu from '@renderer/components/ui/ContextMenu.vue';
 import FilterBox from '@renderer/components/ui/FilterBox.vue';
 import NodeIcon from './NodeIcon.vue';
+import PanelToggleButton from './PanelToggleButton.vue';
 import { ROW_HEIGHT, usePanelActivation } from './usePanelActivation.js';
 import { KEY_ARROW_DOWN } from '@renderer/keys.js';
 import Twisty from '@renderer/components/ui/Twisty.vue';
@@ -194,6 +195,8 @@ function onFilterKeydown(event: KeyboardEvent): void
           </g>
         </svg>
       </button>
+
+      <PanelToggleButton />
     </div>
 
     <div ref="scroller" class="scroller" @contextmenu.self="onBackgroundContextMenu">

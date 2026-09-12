@@ -29,6 +29,7 @@
     "test:e2e:conflicts": "playwright test e2e/conflicts.spec.ts",
     "fixture:commit": "node scripts/make-commit-fixture.mjs",
     "fixture:automerge": "node scripts/make-automerge-fixture.mjs",
+    "fixture:demo": "node scripts/make-demo-fixture.mjs",
     "profile": "node scripts/profile.mjs"
   },
   "dependencies": {

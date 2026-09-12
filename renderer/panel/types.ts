@@ -40,6 +40,16 @@ export const SECTION_LABELS: Record<PanelSectionId, string> = {
   stashes: 'Stashes'
 };
 
+/** What each section holds, for drawing it where there is no room for its name. */
+export const SECTION_KINDS: Record<PanelSectionId, PanelNodeKind> = {
+  branches: 'branch',
+  remotes: 'remote',
+  worktrees: 'worktree',
+  tags: 'tag',
+  submodules: 'submodule',
+  stashes: 'stash'
+};
+
 /** A section's node id. One place builds it, so nothing else has to know the format. */
 export const sectionNodeId = (id: PanelSectionId): string => `section:${id}`;
 

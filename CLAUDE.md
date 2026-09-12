@@ -52,6 +52,7 @@ npm run typecheck  # tsc for main, vue-tsc for renderer
 npm run eslint      # Allman braces, no ternaries: enforced, not just styled
 npm run fixture:commit  # build a repo full of awkward diffs for the commit screen
 npm run fixture:automerge  # build a repo of conflicts for the word-level auto-merge
+npm run fixture:demo       # build `harbour`, the repo the README screenshots are shot on
 npm run test:e2e            # the whole driven suite: the built app, under Playwright
 npm run test:e2e:commit     # every commit-screen action, checking before against after
 npm run test:e2e:dialogs    # every operation dialog, from a real entry point
@@ -66,7 +67,9 @@ called forty times a render, 189ms of a scroll and not one entry anywhere. Addin
 scenario is adding an entry to `SCENARIOS`, never a branch in the runner.
 
 The fixture is named for what it covers: the commit screen's cases, not a general demo
-repository. `-- --force` rebuilds it, `--conflict` leaves a merge unresolved, `--big` adds
+repository. `fixture:demo` is the other one: `harbour`, a history with lanes, branches,
+tags, a stash and a dirty tree, which is what the README is shot on. Re-taking a shot is
+that command, a build, and the `run-app` driver. `-- --force` rebuilds it, `--conflict` leaves a merge unresolved, `--big` adds
 300 files, `--path <dir>` moves it. Default is `../gitext-commit-fixture`.
 
 ## The driven suite
@@ -577,6 +580,8 @@ import more than one.
 - `factList.css`: a `<dl>` of names and values, the values in the code font
 - `conflictSummary.css`: the "N conflicts remaining" line both conflict windows draw
 - `controlText.css`: a label and its hint, side by side while there is room
+- `hoverLabel.css`: a control's name, beside it on hover, where the strip is too narrow
+  to write it (the collapsed left panel's rail)
 
 ### When not to extract
 

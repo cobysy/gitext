@@ -33,6 +33,7 @@ import ChangedFiles from '@renderer/components/filelist/ChangedFiles.vue';
 import DiffViewer from '@renderer/components/diff/DiffViewer.vue';
 import BlobViewer from '@renderer/components/diff/BlobViewer.vue';
 import LeftPanel from '@renderer/components/leftpanel/LeftPanel.vue';
+import LeftPanelRail from '@renderer/components/leftpanel/LeftPanelRail.vue';
 import RevisionGrid from '@renderer/components/revisiongrid/RevisionGrid.vue';
 import CommandLogPanel from '@renderer/components/transparency/CommandLogPanel.vue';
 import CommandPalette from '@renderer/components/CommandPalette.vue';
@@ -361,6 +362,7 @@ onUnmounted(() =>
           </div>
           <PaneSplitter :pane="panelPane" />
         </template>
+        <LeftPanelRail v-else />
 
         <div class="workspace">
           <!-- The grid and the commit info are one band: the info says what the row you

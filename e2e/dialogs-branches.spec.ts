@@ -656,3 +656,32 @@ test('set a branch’s upstream, from the panel row it belongs to', async ({ app
   expect(repo.git(['config', '--get', 'branch.untracked-branch.remote'])).toBe('');
   expect(repo.git(['config', '--get', 'branch.untracked-branch.merge'])).toBe('');
 });
+
+/** Last on purpose: a restore click that never lands must not reach another step. */
+test('collapses the left panel to a rail, and comes back from it', async ({ app, settings }) =>
+{
+  const panel = app.main.locator('.left-panel');
+  const rail = app.main.locator('.panel-rail');
+
+  await expect(panel, 'the panel was not open to begin with').toBeVisible();
+  await expect(rail).toHaveCount(0);
+
+  await panel.locator('.filter button[aria-label="Hide the left panel"]').dispatchEvent('click');
+
+  await expect(panel).toHaveCount(0);
+  await expect(rail, 'nothing was left to bring the panel back').toBeVisible();
+  await expect(() => expect(settings.read('showLeftPanel')).toBe(false)).toPass();
+
+  const stashes = rail.locator('button[aria-label="Show the left panel at Stashes"]');
+  await expect(stashes).toBeVisible();
+  await stashes.dispatchEvent('click');
+
+  await expect(panel).toBeVisible();
+  await expect(rail).toHaveCount(0);
+  // What the rail asked for, not what is stashed: forty steps have run by now.
+  await expect(
+    panel.locator('.row.selected'),
+    'the panel did not open at the section the rail named'
+  ).toHaveText(/Stashes/);
+  await expect(() => expect(settings.read('showLeftPanel')).toBe(true)).toPass();
+});

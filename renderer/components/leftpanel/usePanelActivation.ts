@@ -5,7 +5,7 @@
  * change, independent of the virtualizer/rows or the context/sort/background menus.
  */
 
-import { nextTick, watch, type Ref } from 'vue';
+import { nextTick, onMounted, watch, type Ref } from 'vue';
 import { runCommand } from '@renderer/commands/registry.js';
 import { useCommandContext } from '@renderer/composables/useCommands.js';
 import { KEY_ARROW_DOWN, KEY_ARROW_LEFT, KEY_ARROW_RIGHT, KEY_ARROW_UP, KEY_END, KEY_ENTER, KEY_HOME, isModPressed } from '@renderer/keys.js';
@@ -239,15 +239,24 @@ export function usePanelActivation(opts: PanelActivationOptions)
     () => objects.selectedId,
     () =>
     {
-      void nextTick(() =>
-      {
-        if (opts.activeIndex() !== -1)
-        {
-          scrollIntoView(opts.activeIndex());
-        }
-      });
+      void revealSelection();
     }
   );
+
+  /** And the selection it was born holding: the rail picks one while nothing is mounted. */
+  onMounted(() =>
+  {
+    void revealSelection();
+  });
+
+  async function revealSelection(): Promise<void>
+  {
+    await nextTick();
+    if (opts.activeIndex() !== -1)
+    {
+      scrollIntoView(opts.activeIndex());
+    }
+  }
 
   return {
     activate,
