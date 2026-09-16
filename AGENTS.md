@@ -6,7 +6,15 @@
 
 ## Status
 
-**Nothing in flight.** The last piece of work was *Delete Branch* on the revision grid's
+**Nothing in flight.** The last piece of work was *Clean Up Branches* learning about the
+server. Its "Merged into" picker lists remote-tracking branches too and opens on
+`origin/main` (`renderer/model/cleanupComparison.ts`), and a *Fetch & Prune* button runs
+`fetch --prune --all` and rescans. Which flag a branch gets is `StaleBranch.needsForce`,
+not its reason: `git branch -d` judges against the branch's upstream or HEAD, never the
+comparison, so a branch landed on `origin/main` needs `-D` while HEAD is behind it. The
+local copy of a remote comparison (`main` for `origin/main`) is kept back.
+
+Before that, *Delete Branch* on the revision grid's
 context menu: a submenu of the right-clicked commit's branches, the same rows as *Checkout
 Branch* (`renderer/model/branchRows.ts`). Each row runs `branch.delete` with the branch
 as its operand; a remote one goes to `branch.deleteRemote`, since that is a push.

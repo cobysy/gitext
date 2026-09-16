@@ -706,6 +706,53 @@ test('set a branch’s upstream, from the panel row it belongs to', async ({ app
   expect(repo.git(['config', '--get', 'branch.untracked-branch.merge'])).toBe('');
 });
 
+/**
+ * Cleaning up a branch merged on the server, which only a fetch can reveal.
+ *
+ * The merge happens in the bare remote, so before the fetch `origin/main` lacks it and
+ * the branch is kept back; after it the branch is offered with its upstream gone. HEAD
+ * never contains it, so `-d` would refuse: the preview has to say `-D`.
+ */
+test('clean up a branch merged on the server, after fetching', async ({ app, repo }, testInfo) =>
+{
+  const origin = originOf(repo.dir);
+  repo.git(['fetch', '-q', 'origin']);
+  const landed = repo.git([
+    ...IDENT,
+    'commit-tree',
+    'origin/main^{tree}',
+    '-p',
+    'origin/main',
+    '-m',
+    'landed on the server'
+  ]);
+  repo.git(['branch', '-f', 'landed', landed]);
+  repo.git(['push', '-q', '-u', 'origin', 'landed']);
+  repo.git(['update-ref', 'refs/heads/main', landed], origin);
+  repo.git(['update-ref', '-d', 'refs/heads/landed'], origin);
+  await refreshApp(app);
+
+  const dialog = await openViaPalette(app, 'Clean Up Merged Branches', 'Clean Up Branches');
+  const keptBack = dialog.page.locator('.kept .item').filter({ hasText: 'landed' });
+  await expect(keptBack, 'the branch was offered before the fetch showed it landed').toHaveCount(1);
+
+  await dialog.click('Fetch & Prune');
+  await dialog.tickNamed('landed');
+  const preview = await dialog.preview();
+  await testInfo.attach('preview', { body: preview });
+  expect(preview, 'git would refuse -d: HEAD does not contain the branch').toContain(
+    'branch -D landed'
+  );
+  await dialog.click('Delete 1 Branch');
+  await app.expectFormsClosed(15_000);
+
+  expect(repo.branches(), 'the landed branch survived').not.toContain('landed');
+  expect(
+    repo.git(['for-each-ref', '--format=%(refname:short)', 'refs/remotes']),
+    'the fetch did not prune the deleted branch'
+  ).not.toContain('origin/landed');
+});
+
 /** Last on purpose: a restore click that never lands must not reach another step. */
 test('collapses the left panel to a rail, and comes back from it', async ({ app, settings }) =>
 {

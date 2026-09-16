@@ -73,3 +73,6 @@ export const STAGING: readonly RepoFacet[] = ['index'];
 
 /** Creating, deleting, renaming or moving a branch or tag. */
 export const REFS: readonly RepoFacet[] = ['refs'];
+
+/** A fetch: remote-tracking refs move and commits come in; HEAD and both trees stay put. */
+export const FETCH: readonly RepoFacet[] = ['refs', 'commits'];

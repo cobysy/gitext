@@ -91,6 +91,8 @@ export {
 export {
   buildFetchArgs,
   buildPullArgs,
+  ALL_REMOTES,
+  PULL_ACTION_FETCH,
   PULL_ACTIONS,
   type FetchOptions,
   type PullAction,
