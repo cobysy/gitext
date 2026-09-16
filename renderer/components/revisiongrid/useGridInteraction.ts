@@ -21,7 +21,7 @@ import { runCommand } from '@renderer/commands/registry.js';
 import { useCommandContext } from '@renderer/composables/useCommands.js';
 import { useContextMenu } from '@renderer/composables/useContextMenu.js';
 import { stepRow } from '@renderer/gridnav.js';
-import { checkoutRowsFor } from '@renderer/model/checkoutRows.js';
+import { branchRowsFor } from '@renderer/model/branchRows.js';
 import { refsAtHead } from '@renderer/model/refsAtHead.js';
 import { resolveMenu } from '@renderer/menus/resolve.js';
 import { revisionGridMenu, workingDirectoryMenu } from '@renderer/menus/revisionGrid.js';
@@ -115,7 +115,7 @@ export function useGridInteraction(opts: GridInteractionOptions)
     }
     else
     {
-      nodes = revisionGridMenu(checkoutRowsFor(refsOf(row)));
+      nodes = revisionGridMenu(branchRowsFor(refsOf(row)));
     }
     // Resolved once, at open: re-greying while open would flicker on every background
     // refresh. The branches on *this* row go in with it, building the checkout submenu.

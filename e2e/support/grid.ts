@@ -200,3 +200,35 @@ export async function modClickNeighbour(app: GitextApp): Promise<void>
 
   await expect(app.main.locator('.grid .row.selected')).toHaveCount(2);
 }
+
+/**
+ * Right-click a commit in the grid and click a row of one of its menu's submenus.
+ *
+ * For the submenus whose rows are the commit's own branches: the operand is the row that
+ * was clicked, so no palette query can stand in for it. Opened by the events the menu
+ * listens for, `contextmenu` on the grid row and `mouseenter` on the submenu's row.
+ */
+export async function runFromGridSubmenu(
+  app: GitextApp,
+  needle: string,
+  submenuLabel: string,
+  rowLabel: string
+): Promise<void>
+{
+  await selectCommit(app, needle);
+  const row = app.main.locator(GRID_ROW).filter({ hasText: needle }).first();
+  await row.dispatchEvent('contextmenu');
+
+  const menu = app.main.locator('.menu:not(.nested)');
+  await expect(menu, 'the grid context menu').toBeVisible();
+  await menu.locator('.row').filter({ hasText: submenuLabel }).first().dispatchEvent('mouseenter');
+
+  const nested = app.main.locator('.menu.nested');
+  await expect(nested, `the "${submenuLabel}" submenu`).toBeVisible();
+  await nested
+    .locator('.row')
+    .filter({ has: app.main.locator('.label', { hasText: new RegExp(`^${rowLabel}$`) }) })
+    .first()
+    .dispatchEvent('click');
+  await expect(app.main.locator('.menu'), 'the grid context menu to close').toHaveCount(0);
+}

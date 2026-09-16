@@ -6,7 +6,12 @@
 
 ## Status
 
-**Nothing in flight.** The last piece of work was the left panel's collapse control.
+**Nothing in flight.** The last piece of work was *Delete Branch* on the revision grid's
+context menu: a submenu of the right-clicked commit's branches, the same rows as *Checkout
+Branch* (`renderer/model/branchRows.ts`). Each row runs `branch.delete` with the branch
+as its operand; a remote one goes to `branch.deleteRemote`, since that is a push.
+
+Before that, the left panel's collapse control.
 
 A `‹` in the panel's filter strip, a 28px rail at the window's edge when it is hidden:
 `PanelToggleButton` in both, running `view.toggleLeftPanel` rather than patching the

@@ -387,9 +387,10 @@ describe('the revision-grid menu declaration', () =>
   it('keeps to what is used on a commit day to day', () =>
   {
     // The trim is the point of this menu, so its size is asserted rather than left to
-    // drift back. Raise this deliberately, if at all.
+    // drift back. Raise this deliberately, if at all: the last raise was *Delete Branch*,
+    // since a branch seen on a commit should not have to be found again in the panel.
     const topLevel = revisionGridMenu().filter((node: MenuNode) => node.kind !== 'separator');
-    expect(topLevel.length).toBeLessThanOrEqual(16);
+    expect(topLevel.length).toBeLessThanOrEqual(17);
   });
 
   it('nests one level deep, never two', () =>
@@ -912,6 +913,57 @@ describe('the revision grid checkout submenu', () =>
     // And the picker is not sitting beside it: that row lives in the Branch menu, where
     // no commit has been pointed at.
     expect(items.some((i) => i.kind === 'command' && i.id === 'branch.checkout')).toBe(false);
+  });
+});
+
+describe('the revision grid delete submenu', () =>
+{
+  const gridCtx = ctx({ hasRepo: true, selectionCount: 1 });
+
+  it('offers the same branches as the checkout submenu, each carrying its operand', () =>
+  {
+    const items = resolveMenu(
+      revisionGridMenu([
+        { ref: 'feature', remote: false },
+        { ref: 'origin/feature', remote: true }
+      ]),
+      gridCtx
+    );
+    const remove = items.find((i) => i.kind === 'submenu' && i.label === 'Delete Branch');
+
+    if (remove?.kind !== 'submenu')
+    {
+      throw new Error('no Delete Branch submenu');
+    }
+    // A remote row keeps `remote`, which is what sends it to the dialog that pushes.
+    expect(
+      remove.items.map((i) =>
+      {
+        if (i.kind === 'command')
+        {
+          return [i.id, i.label, i.options];
+        }
+        else
+        {
+          return null;
+        }
+      })
+    ).toEqual([
+      ['branch.delete', 'feature', { ref: 'feature', remote: false }],
+      ['branch.delete', 'origin/feature', { ref: 'origin/feature', remote: true }]
+    ]);
+  });
+
+  it('greys when the commit carries no branch but the current one', () =>
+  {
+    const items = resolveMenu(revisionGridMenu([]), gridCtx);
+    const remove = items.find((i) => i.kind === 'submenu' && i.label === 'Delete Branch');
+
+    if (remove?.kind !== 'submenu')
+    {
+      throw new Error('the row is gone entirely');
+    }
+    expect(remove.enabled).toBe(false);
   });
 });
 

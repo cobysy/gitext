@@ -52,6 +52,22 @@ function branchAtSelection(): string | undefined
   }
 }
 
+/**
+ * A remote branch is deleted by a push, which is its own dialog: the local list has no
+ * row for it. The ref goes to whichever one owns it, where it arrives already ticked.
+ */
+function openDeleteBranch(ref: string | undefined, remote: boolean): void
+{
+  if (remote)
+  {
+    useUiStore().openDialog('branch.deleteRemote', { ref });
+  }
+  else
+  {
+    useUiStore().openDialog('branch.delete', { branchName: ref });
+  }
+}
+
 export function implementRevisionCommands(): void
 {
   implementCommand('branch.checkout', () =>
@@ -106,9 +122,11 @@ export function implementRevisionCommands(): void
 
   // Nothing pre-ticked: the row opened the dialog on the *checked-out* branch, which git
   // refuses to delete: so the one branch it offered was the one that could never work.
-  implementCommand('branch.delete', () =>
+  // An operand from the grid's submenu ticks that branch; without one, from the menu bar
+  // or the palette, the list opens with nothing ticked.
+  implementCommand('branch.delete', (options?: { ref?: string; remote?: boolean }) =>
   {
-    useUiStore().openDialog('branch.delete');
+    openDeleteBranch(options?.ref, options?.remote === true);
   });
 
   implementCommand('branch.merge', () =>

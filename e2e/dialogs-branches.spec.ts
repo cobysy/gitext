@@ -15,7 +15,7 @@ import type { GitextApp } from './support/app.js';
 import { Dialog } from './support/dialog.js';
 import { waitForConsole } from './support/console.js';
 import { originOf } from './fixtures/dialogsRepo.js';
-import { refreshApp, selectCommit } from './support/grid.js';
+import { refreshApp, runFromGridSubmenu, selectCommit } from './support/grid.js';
 import { openViaPalette } from './support/palette.js';
 import { runFromPanelMenu, selectPanelNode } from './support/panel.js';
 import { settle } from './support/options.js';
@@ -617,6 +617,55 @@ test('delete two branches at once, forcing the unmerged one', async ({ app, repo
   const names = repo.branches();
   expect(names, 'the merged branch survived').not.toContain('doomed-merged');
   expect(names, 'the unmerged branch survived the force').not.toContain('doomed-unmerged');
+});
+
+/**
+ * Deleting a branch from the commit it sits on.
+ *
+ * The operand is the submenu row, so what is checked is that the dialog opened with that
+ * branch already ticked: the step presses Delete without ticking anything itself.
+ */
+test('delete a branch from the grid row it points at', async ({ app, repo }, testInfo) =>
+{
+  repo.git(['branch', '-f', 'doomed-grid', 'main']);
+  await refreshApp(app);
+
+  await runFromGridSubmenu(app, 'doomed-grid', 'Delete Branch', 'doomed-grid');
+  const dialog = new Dialog(await app.waitForAnyDialog(8000, 'Delete Branch'));
+  expect(await dialog.title(), 'the grid row opened the wrong dialog').toBe('Delete Branches');
+  await expect(
+    dialog.page.locator('.checks label').filter({ hasText: 'doomed-grid' }).locator('input'),
+    'the branch the row named is not ticked'
+  ).toBeChecked();
+  await testInfo.attach('preview', { body: await dialog.preview() });
+  await dialog.click('Delete Branch');
+  await app.expectFormsClosed(12_000);
+
+  await expect(() => expect(repo.branches(), 'the branch survived').not.toContain('doomed-grid'))
+    .toPass();
+});
+
+/**
+ * The same submenu on a remote branch, which is a push rather than a `branch -d`: the
+ * row has to reach the remote dialog, with the ref ticked there.
+ */
+test('delete a remote branch from the grid row it points at', async ({ app, repo }, testInfo) =>
+{
+  repo.git(['push', '-q', 'origin', 'main:doomed-grid-remote']);
+  repo.git(['fetch', '-q', 'origin']);
+  await refreshApp(app);
+
+  await runFromGridSubmenu(app, 'origin/doomed-grid-remote', 'Delete Branch', 'origin/doomed-grid-remote');
+  const dialog = new Dialog(await app.waitForAnyDialog(8000, 'Delete Branch'));
+  expect(await dialog.title(), 'the grid row opened the wrong dialog').toBe('Delete Branches on origin');
+  await testInfo.attach('preview', { body: await dialog.preview() });
+  await dialog.click('Delete on Remote');
+  await app.expectFormsClosed(15_000);
+
+  expect(
+    repo.git(['ls-remote', '--heads', 'origin', 'doomed-grid-remote']),
+    'the branch is still on the remote'
+  ).toBe('');
 });
 
 test('set a branch’s upstream, from the panel row it belongs to', async ({ app, repo }, testInfo) =>

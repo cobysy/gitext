@@ -3,7 +3,7 @@
  * One level deep: daily operations only. Everything else on its own surface.
  */
 
-import type { CheckoutRow } from '@renderer/model/checkoutRows.js';
+import type { BranchRow } from '@renderer/model/branchRows.js';
 import { copyMenu } from './copy.js';
 import { item, operand, separator, submenu, type MenuNode } from './resolve.js';
 
@@ -29,22 +29,32 @@ export const workingDirectoryMenu: MenuNode[] = [
 ];
 
 /**
- * Function not constant: first entry is dynamic (branches on this commit).
+ * A submenu of this commit's branches, each row running `id` on the branch it names.
+ * Greyed rather than dropped when there are none: that is a fact about the commit.
  */
-export function revisionGridMenu(checkoutRows: readonly CheckoutRow[] = []): MenuNode[]
+function branchSubmenu(label: string, id: string, rows: readonly BranchRow[]): MenuNode
+{
+  return submenu(
+    label,
+    rows.map((row) => operand(id, row.ref, { ref: row.ref, remote: row.remote })),
+    { greyWhenEmpty: true }
+  );
+}
+
+/**
+ * Function not constant: the branch submenus are dynamic (branches on this commit).
+ */
+export function revisionGridMenu(branchRows: readonly BranchRow[] = []): MenuNode[]
 {
   return [
   // Both checkouts: branch (common) and detached HEAD (rarer, but both needed).
   // Submenu of this commit's branches, not a picker that would re-ask an answered question.
-    submenu(
-      'Checkout Branch',
-      checkoutRows.map((row) =>
-        operand('revision.checkoutBranchHere', row.ref, { ref: row.ref, remote: row.remote })
-      ),
-      { greyWhenEmpty: true }
-    ),
+    branchSubmenu('Checkout Branch', 'revision.checkoutBranchHere', branchRows),
     item('commit.checkout'),
     item('branch.create'),
+    // The same rows as the checkout submenu: a branch you can see on a commit is one you
+    // can remove from there, rather than hunting for it again in the left panel.
+    branchSubmenu('Delete Branch', 'branch.delete', branchRows),
     item('tag.create'),
     separator,
     item('branch.merge'),
