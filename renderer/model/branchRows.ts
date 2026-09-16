@@ -1,20 +1,22 @@
 /**
- * Checkable branches for a commit: excludes current and origin/HEAD (not a real branch).
- * Pure, testable logic (not in menu code).
+ * The branches a right-clicked commit can act on: the rows of the revision grid's
+ * *Checkout Branch* and *Delete Branch* submenus. Excludes the current branch, which
+ * neither checking out nor deleting can do anything with, and origin/HEAD, which is a
+ * pointer rather than a branch. Pure, testable logic (not in menu code).
  */
 
 import { REF_KIND_BRANCH, REF_KIND_REMOTE, type CommitRef } from '@shared/types.js';
 
 const HEAD_SUFFIX = '/HEAD';
 
-export interface CheckoutRow {
+export interface BranchRow {
   /** The ref as git names it: `main`, `origin/feature`. */
   ref: string;
-  /** Remote branches check out differently: the dialog asks about tracking first. */
+  /** Remote branches check out and delete differently: through tracking, and through a push. */
   remote: boolean;
 }
 
-export function checkoutRowsFor(refs: readonly CommitRef[]): CheckoutRow[]
+export function branchRowsFor(refs: readonly CommitRef[]): BranchRow[]
 {
   const usable = refs.filter(
     (ref) =>
