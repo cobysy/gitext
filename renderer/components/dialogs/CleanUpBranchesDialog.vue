@@ -1,27 +1,36 @@
 <script setup lang="ts">
 /**
- * Delete local branches whose work has landed. Squash-merged branches need `-D` (no ancestry link).
+ * Delete local branches whose work has landed. Squash-merged branches need `-D` (no ancestry link),
+ * and so does any branch `git branch -d` would judge against a HEAD that is behind the comparison.
  * Dialog shows why each branch is offered, lists kept-back branches, and shows all steps in preview.
+ * Merges done on the server only show up after a fetch, so one is a button away.
  */
 
 import { computed, onMounted, ref, watch } from 'vue';
 import { api, toMessage } from '@renderer/api.js';
 import { formatRelativeDate } from '@renderer/format.js';
 import { useDialog, type Step } from '@renderer/composables/useDialog.js';
-import { buildBranchDeleteSteps } from '@renderer/model/args/index.js';
-import { REF_KIND_BRANCH, type BranchCleanupReport } from '@shared/types.js';
+import {
+  ALL_REMOTES,
+  buildBranchDeleteSteps,
+  buildPullArgs,
+  PULL_ACTION_FETCH
+} from '@renderer/model/args/index.js';
+import { comparisonOptions, defaultComparison } from '@renderer/model/cleanupComparison.js';
+import type { BranchCleanupReport, StaleBranchReason } from '@shared/types.js';
 import DialogFrame from '@renderer/components/ui/DialogFrame.vue';
 import FormSelect from '@renderer/components/ui/FormSelect.vue';
 import CommandPreview from '@renderer/components/transparency/CommandPreview.vue';
-import { REFS } from '@shared/invalidation.js';
+import { FETCH, REFS } from '@shared/invalidation.js';
 
 const props = defineProps<{ repoPath: string }>();
 const emit = defineEmits<{ close: [] }>();
-const { busy, error, runSteps } = useDialog();
+const { busy, error, run: runGit, runSteps } = useDialog();
 
-// Branch cleanup reasons
-const REASON_SQUASHED = 'squashed';
-const REASON_CONTAINED = 'contained';
+const REASON_LABELS: Record<StaleBranchReason, string> = {
+  contained: 'merged',
+  squashed: 'squash-merged'
+};
 
 const FLAG_DELETE_FORCE = '-D';
 
@@ -30,18 +39,42 @@ const branches = ref<{ value: string; label: string }[]>([]);
 const report = ref<BranchCleanupReport | null>(null);
 const picked = ref(new Set<string>());
 const scanning = ref(false);
+const hasRemotes = ref(false);
+const fetching = ref(false);
+
+/** Every remote, pruned: a branch deleted on the server is what "upstream gone" reads. */
+const fetchArgv = buildPullArgs({ action: PULL_ACTION_FETCH, remote: ALL_REMOTES, prune: true });
 
 const stale = computed(() => report.value?.stale ?? []);
 const keptBack = computed(() => report.value?.keptBack ?? []);
 
+const pickedBranches = computed(() => stale.value.filter((b) => picked.value.has(b.name)));
+
 /** Split by which flag each branch needs: the plan the preview and the run both read. */
 const plan = computed(() => ({
-  safe: stale.value.filter((b) => b.reason === REASON_CONTAINED && picked.value.has(b.name)).map((b) => b.name),
-  forced: stale.value.filter((b) => b.reason === REASON_SQUASHED && picked.value.has(b.name)).map((b) => b.name)
+  safe: pickedBranches.value.filter((b) => !b.needsForce).map((b) => b.name),
+  forced: pickedBranches.value.filter((b) => b.needsForce).map((b) => b.name)
 }));
 
 const steps = computed(() => buildBranchDeleteSteps(plan.value));
 const pickedCount = computed(() => plan.value.safe.length + plan.value.forced.length);
+
+const deleteLabel = computed(() =>
+{
+  if (busy.value && !fetching.value)
+  {
+    return 'Deleting…';
+  }
+  if (pickedCount.value === 1)
+  {
+    return 'Delete 1 Branch';
+  }
+  if (pickedCount.value === 0)
+  {
+    return 'Delete Branches';
+  }
+  return `Delete ${pickedCount.value} Branches`;
+});
 
 /**
  * The same steps, each carrying the sentence its failure belongs to. `-d` refusing a
@@ -54,7 +87,7 @@ const labelled = computed((): Step[] =>
     let label: string;
     if (argv.includes(FLAG_DELETE_FORCE))
     {
-      label = 'Force-deleting the squash-merged branches failed';
+      label = 'Force-deleting the branches git cannot verify failed';
     }
     else
     {
@@ -131,24 +164,60 @@ async function run(): Promise<void>
   error.value = failure;
 }
 
-onMounted(async () =>
+/**
+ * What can be compared against. The comparison is only replaced when it no longer exists:
+ * a fetch that prunes the branch someone chose is the one time it has to move.
+ */
+async function loadComparisons(): Promise<void>
 {
+  const [refs, remotes] = await Promise.all([
+    api['refs:list'](props.repoPath),
+    api['remote:list'](props.repoPath)
+  ]);
+  branches.value = comparisonOptions(refs);
+  hasRemotes.value = remotes.length > 0;
+  if (!branches.value.some((option) => option.value === comparison.value))
+  {
+    comparison.value = defaultComparison(refs);
+  }
+}
+
+async function reload(): Promise<void>
+{
+  const before = comparison.value;
   try
   {
-    const refs = await api['refs:list'](props.repoPath);
-    const locals = refs.filter((r) => r.kind === REF_KIND_BRANCH);
-    branches.value = locals.map((r) => ({ value: r.name, label: r.name }));
-    // Default to the branch work lands on, when it is one of the usual names; otherwise
-    // whatever is checked out, which is at least a branch that exists.
-    const preferred = ['main', 'master', 'develop'].find((n) => locals.some((r) => r.name === n));
-    comparison.value = preferred ?? locals.find((r) => r.isCurrent)?.name ?? locals[0]?.name ?? '';
+    await loadComparisons();
   }
   catch (e)
   {
     error.value = toMessage(e);
   }
-  await scan();
-});
+  // A comparison that changed is rescanned by its watcher; one that did not has new refs
+  // under the same name, and nothing else notices.
+  if (comparison.value === before)
+  {
+    await scan();
+  }
+}
+
+async function fetchAndPrune(): Promise<void>
+{
+  fetching.value = true;
+  try
+  {
+    if (await runGit(fetchArgv, FETCH, { close: false, console: true }))
+    {
+      await reload();
+    }
+  }
+  finally
+  {
+    fetching.value = false;
+  }
+}
+
+onMounted(reload);
 
 watch(comparison, scan);
 </script>
@@ -192,8 +261,9 @@ watch(comparison, scan);
             </label>
             <span class="tags">
               <span class="tag" :class="branch.reason">
-                {{ branch.reason === REASON_SQUASHED ? 'squash-merged · needs -D' : 'merged' }}
+                {{ REASON_LABELS[branch.reason] }}
               </span>
+              <span v-if="branch.needsForce" class="tag force">needs <code>-D</code></span>
               <span v-if="branch.upstreamGone" class="tag gone">upstream gone</span>
             </span>
             <span class="age">{{ formatRelativeDate(branch.date) }}</span>
@@ -225,16 +295,20 @@ watch(comparison, scan);
 
       <p v-if="plan.forced.length" class="warn">
         {{ plan.forced.length }} {{ plan.forced.length === 1 ? 'branch' : 'branches' }} will
-        be deleted with <code>-D</code>. git cannot verify a squash merge itself.
+        be deleted with <code>-D</code>: git cannot see that they landed.
       </p>
 
       <p v-if="error" class="error">{{ error }}</p>
     </div>
 
     <template #actions>
+      <button v-if="hasRemotes" :disabled="busy || scanning" @click="fetchAndPrune">
+        {{ fetching ? 'Fetching…' : 'Fetch & Prune' }}
+      </button>
+      <span class="spacer" />
       <button @click="emit('close')">Cancel</button>
       <button class="danger" :disabled="pickedCount === 0 || busy" @click="run">
-        {{ busy ? 'Deleting…' : `Delete ${pickedCount || ''} Branch${pickedCount === 1 ? '' : 'es'}`.replace(/\s+/g, ' ') }}
+        {{ deleteLabel }}
       </button>
     </template>
   </DialogFrame>
@@ -318,7 +392,7 @@ watch(comparison, scan);
 
 /* The rows that need `-D` are the ones worth a second look, so they carry the warning
    colour rather than the neutral one. */
-.tag.squashed {
+.tag.force {
   border-color: var(--warning);
   color: var(--warning);
 }

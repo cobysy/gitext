@@ -41,8 +41,8 @@ export interface RefEntry {
 /**
  * Why a local branch is safe to delete.
  *
- * - `contained`: every commit on it is already an ancestor of the comparison branch;
- *   `git branch -d` accepts it on its own.
+ * - `contained`: every commit on it is already an ancestor of the comparison branch.
+ *   Whether `git branch -d` accepts it is a separate question: see `StaleBranch.needsForce`.
  * - `squashed`: its *content* is on the comparison branch as one squashed commit with
  *   no ancestry link, which git's merge test can't see: only `-D` deletes it, the flag with no safety net.
  */
@@ -59,6 +59,13 @@ export interface StaleBranch {
   date: number;
   /** Whether the branch tracked an upstream that has since been deleted. */
   upstreamGone: boolean;
+  /**
+   * `git branch -d` would refuse it, so only `-D` deletes it. `-d` asks whether the work
+   * is on the branch's upstream, or on HEAD when there is none, never on the comparison:
+   * so a branch landed on `origin/main` still needs `-D` while HEAD is behind it.
+   * Always true for `squashed`.
+   */
+  needsForce: boolean;
 }
 
 /** The answer to "which branches could I delete", including what was left out: a silent omission is indistinguishable from a miss. */

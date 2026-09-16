@@ -9,6 +9,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { api, toMessage } from '@renderer/api.js';
 import {
+  ALL_REMOTES,
   buildPullArgs,
   PULL_ACTION_FETCH,
   PULL_ACTIONS,
@@ -54,7 +55,6 @@ const ui = useUiStore();
 const { busy, error, runSteps, run, close } = useDialog();
 
 /** `[ All ]` is git's own `--all`-ish idiom here: every remote, one after another. */
-const ALL_REMOTES = '--all';
 
 const remotes = ref<RemoteEntry[]>([]);
 const remote = ref(props.remoteName ?? '');

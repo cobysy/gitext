@@ -16,6 +16,9 @@ const PULL_ACTION_MERGE = 'merge';
 const PULL_ACTION_REBASE = 'rebase';
 export const PULL_ACTION_FETCH = 'fetch';
 
+/** The remote operand that means every remote: `fetch --all`. */
+export const ALL_REMOTES = '--all';
+
 // Tag fetch modes
 const TAG_FETCH_DEFAULT = 'default';
 const TAG_FETCH_NONE = 'none';

@@ -130,6 +130,77 @@ describe('listStaleBranches', () =>
     expect(examined).toBe(4);
   });
 
+  it('lets git verify a merged branch HEAD contains, with -d', async () =>
+  {
+    const { stale } = await listStaleBranches(repo, 'main');
+    expect(stale.find((b) => b.name === 'merged-normally')?.needsForce).toBe(false);
+  });
+
+  it('needs -D for a squash-merged branch, whatever HEAD holds', async () =>
+  {
+    const { stale } = await listStaleBranches(repo, 'main');
+    expect(stale.find((b) => b.name === 'squashed-away')?.needsForce).toBe(true);
+  });
+
+  it('needs -D for a merged branch while HEAD is behind the comparison', async () =>
+  {
+    await runGit(repo, ['checkout', '--detach', 'main~2']);
+    try
+    {
+      const { stale } = await listStaleBranches(repo, 'main');
+      expect(stale.find((b) => b.name === 'merged-normally')?.needsForce).toBe(true);
+      // The premise: `-d` judges against HEAD, not against the comparison, and refuses.
+      const refused = await runGit(repo, ['branch', '-d', 'merged-normally']).then(
+        () => false,
+        () => true
+      );
+      expect(refused).toBe(true);
+    }
+    finally
+    {
+      await runGit(repo, ['checkout', 'main']);
+    }
+  });
+
+  describe('against a remote-tracking comparison', () =>
+  {
+    beforeAll(async () =>
+    {
+      await runGit(repo, ['remote', 'add', 'origin', join(root, 'nowhere.git')]);
+      await runGit(repo, ['update-ref', 'refs/remotes/origin/main', 'main']);
+      await runGit(repo, ['branch', 'tracks-origin', 'main~1']);
+      await runGit(repo, ['branch', '--set-upstream-to', 'origin/main', 'tracks-origin']);
+    });
+
+    afterAll(async () =>
+    {
+      await runGit(repo, ['branch', '-D', 'tracks-origin']);
+      await runGit(repo, ['remote', 'remove', 'origin']);
+    });
+
+    it('keeps back the local copy of the comparison rather than offering it', async () =>
+    {
+      const { stale, keptBack } = await listStaleBranches(repo, 'origin/main');
+      expect(stale.map((b) => b.name)).not.toContain('main');
+      expect(keptBack.find((k) => k.name === 'main')?.why).toBe('the local copy of origin/main');
+    });
+
+    it('judges a branch with a live upstream against that upstream', async () =>
+    {
+      await runGit(repo, ['checkout', '--detach', 'main~2']);
+      try
+      {
+        const { stale } = await listStaleBranches(repo, 'origin/main');
+        expect(stale.find((b) => b.name === 'tracks-origin')?.needsForce).toBe(false);
+        expect(stale.find((b) => b.name === 'merged-normally')?.needsForce).toBe(true);
+      }
+      finally
+      {
+        await runGit(repo, ['checkout', 'main']);
+      }
+    });
+  });
+
   it('leaves the branches themselves alone: it only reports', async () =>
   {
     const before = await runGit(repo, ['branch', '--format=%(refname:short)']);

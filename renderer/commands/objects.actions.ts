@@ -8,7 +8,7 @@
 import { implementCommand } from './registry.js';
 import { buildFetchBranchArgs } from '@renderer/model/args/checkout.js';
 import { checkoutRef, KIND_BRANCH, KIND_REMOTE_BRANCH, KIND_TAG } from './checkoutRef.js';
-import { buildPullArgs, PULL_ACTION_FETCH } from '@renderer/model/args/pull.js';
+import { ALL_REMOTES, buildPullArgs, PULL_ACTION_FETCH } from '@renderer/model/args/pull.js';
 import type { DialogPayload } from '@shared/dialogs.js';
 import { useAfterGitOperation } from '@renderer/composables/useAfterGitOperation.js';
 import { useRepoStore } from '@renderer/stores/repo.js';
@@ -18,9 +18,9 @@ import { useSettingsStore } from '@renderer/stores/settings.js';
 import { useUiStore } from '@renderer/stores/ui.js';
 import { api, toMessage } from '@renderer/api.js';
 import { runConsoleSteps } from '@renderer/gitConsole.js';
+import { FETCH } from '@shared/invalidation.js';
 import { HEAD_REF } from '@renderer/model/sha.js';
 
-const REMOTE_ALL = '--all';
 const BRANCH_SCOPE_ALL = 'all';
 const BRANCH_SCOPE_FILTERED = 'filtered';
 
@@ -207,7 +207,7 @@ export function implementObjectCommands(): void
       // A fetch moves remote-tracking refs and brings commits in; it never touches HEAD or either tree.
       // `true`: over the network, so the console watches it whatever the setting says,
       // the same as the Pull dialog's own fetch.
-      await runConsoleSteps(path, [{ label: 'Fetching', argv }], ['refs', 'commits'], {
+      await runConsoleSteps(path, [{ label: 'Fetching', argv }], FETCH, {
         console: true
       });
       await useAfterGitOperation().afterGitOperation();
@@ -223,14 +223,14 @@ export function implementObjectCommands(): void
 
   implementCommand('remote.fetchAll', () =>
     // `--all` as the remote: every remote, not whichever the dialog would default to.
-    fetchNow(buildPullArgs({ action: PULL_ACTION_FETCH, remote: REMOTE_ALL }), {
-      remoteName: REMOTE_ALL
+    fetchNow(buildPullArgs({ action: PULL_ACTION_FETCH, remote: ALL_REMOTES }), {
+      remoteName: ALL_REMOTES
     })
   );
 
   implementCommand('remote.fetchAllPrune', () =>
-    fetchNow(buildPullArgs({ action: PULL_ACTION_FETCH, remote: REMOTE_ALL, prune: true }), {
-      remoteName: REMOTE_ALL,
+    fetchNow(buildPullArgs({ action: PULL_ACTION_FETCH, remote: ALL_REMOTES, prune: true }), {
+      remoteName: ALL_REMOTES,
       prune: true
     })
   );

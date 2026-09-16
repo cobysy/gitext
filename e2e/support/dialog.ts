@@ -232,6 +232,18 @@ export class Dialog
     await this.press(box, `a row in the list for "${name}"`);
   }
 
+  /**
+   * Tick the checkbox whose accessible name is exactly `name`.
+   *
+   * For a list a dialog draws itself, where `tick`'s substring match can land on a picker
+   * above it that happens to offer the same name as one of its options.
+   */
+  async tickNamed(name: string): Promise<void>
+  {
+    const box = this.page.getByRole('checkbox', { name, exact: true }).first();
+    await this.press(box, `a checkbox named "${name}"`);
+  }
+
   /** Click a button by its text: in the dialog, or in a confirmation on top of it. */
   async click(text: string): Promise<void>
   {

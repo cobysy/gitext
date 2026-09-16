@@ -2,7 +2,13 @@
  * Branches to clean up. Squash merges leave no trace (proved by: contained in merge base, or squashed patch match).
  */
 
-import { REF_KIND_BRANCH, type BranchCleanupReport, type StaleBranch } from '@shared/types.js';
+import {
+  REF_KIND_BRANCH,
+  REF_KIND_REMOTE,
+  type BranchCleanupReport,
+  type RefEntry,
+  type StaleBranch
+} from '@shared/types.js';
 import { listMergedRefs, listRefs } from './refs.js';
 import { GIT_KIND_READ, runGit, tryGit } from './runner.js';
 import { listWorktrees } from './worktree.js';
@@ -17,6 +23,7 @@ const CLEANUP_PROBE_MESSAGE = 'cleanup probe';
 const CHERRY_NEW_MARKER = '+';
 
 const REFS_HEADS_PREFIX = 'refs/heads/';
+const HEAD = 'HEAD';
 
 const REASON_CONTAINED = 'contained';
 const REASON_SQUASHED = 'squashed';
@@ -69,30 +76,80 @@ async function isSquashedInto(
   return !out.split('\n').some((line) => line.startsWith(CHERRY_NEW_MARKER));
 }
 
+/** Local branch names whose tips are ancestors of `commit`. */
+async function localsMergedInto(repoPath: string, commit: string): Promise<Set<string>>
+{
+  const fullNames = await listMergedRefs(repoPath, commit);
+  return new Set(
+    fullNames
+      .filter((name) => name.startsWith(REFS_HEADS_PREFIX))
+      .map((name) => name.slice(REFS_HEADS_PREFIX.length))
+  );
+}
+
+/**
+ * What `git branch -d` judges a branch against: its upstream while that still exists,
+ * HEAD otherwise. Never the comparison the dialog chose, which is why a branch can be
+ * merged into it and still need `-D`.
+ */
+function deleteReference(ref: RefEntry): string
+{
+  if (ref.upstream && !ref.upstreamGone)
+  {
+    return ref.upstream;
+  }
+  return HEAD;
+}
+
+/**
+ * The local branch a remote-tracking comparison is a copy of: `main` for `origin/main`.
+ * It is contained in its own remote copy whenever it is behind, which is not the same
+ * thing as being done with.
+ */
+function localCopyOf(refs: readonly RefEntry[], comparison: string): string | null
+{
+  const remote = refs.find((ref) => ref.kind === REF_KIND_REMOTE && ref.name === comparison);
+  if (!remote?.remote)
+  {
+    return null;
+  }
+  return comparison.slice(remote.remote.length + 1);
+}
+
+/** The local branches merged into a ref, each ref asked of git once: most branches share HEAD. */
+function mergedSets(repoPath: string): (commit: string) => Promise<Set<string>>
+{
+  const cache = new Map<string, Promise<Set<string>>>();
+  return (commit) =>
+  {
+    let found = cache.get(commit);
+    if (!found)
+    {
+      found = localsMergedInto(repoPath, commit);
+      cache.set(commit, found);
+    }
+    return found;
+  };
+}
+
 /**
  * Local branches safe to delete, and the ones deliberately left out.
  *
- * `comparison` is the branch work lands on: usually `main`. It is a parameter rather
- * than a guess because "the branch everything merges into" is a fact about a project,
- * not about a repository, and getting it wrong here would offer to delete live work.
+ * `comparison` is the branch work lands on: `main`, or `origin/main` when the merges
+ * happen on the server. It is a parameter rather than a guess because "the branch
+ * everything merges into" is a fact about a project, not about a repository, and getting
+ * it wrong here would offer to delete live work.
  */
 export async function listStaleBranches(
   repoPath: string,
   comparison: string
 ): Promise<BranchCleanupReport>
 {
-  const [refs, mergedFullNames, worktrees] = await Promise.all([
-    listRefs(repoPath),
-    listMergedRefs(repoPath, comparison),
-    listWorktrees(repoPath)
-  ]);
-
+  const [refs, worktrees] = await Promise.all([listRefs(repoPath), listWorktrees(repoPath)]);
+  const mergedInto = mergedSets(repoPath);
+  const contained = await mergedInto(comparison);
   const locals = refs.filter((ref) => ref.kind === REF_KIND_BRANCH);
-  const contained = new Set(
-    mergedFullNames
-      .filter((name) => name.startsWith(REFS_HEADS_PREFIX))
-      .map((name) => name.slice(REFS_HEADS_PREFIX.length))
-  );
+  const localCopy = localCopyOf(refs, comparison);
 
   // A branch checked out anywhere, this window's HEAD or another worktree's, cannot be
   // deleted, and git would refuse. Saying so up front beats letting the delete fail.
@@ -123,6 +180,11 @@ export async function listStaleBranches(
     {
       continue;
     }
+    if (ref.name === localCopy)
+    {
+      keptBack.push({ name: ref.name, why: `the local copy of ${comparison}` });
+      continue;
+    }
 
     let checkout;
     if (ref.isCurrent)
@@ -143,11 +205,12 @@ export async function listStaleBranches(
 
     if (contained.has(ref.name))
     {
-      stale.push({ ...entry, reason: REASON_CONTAINED });
+      const accepted = (await mergedInto(deleteReference(ref))).has(ref.name);
+      stale.push({ ...entry, reason: REASON_CONTAINED, needsForce: !accepted });
     }
     else if (await isSquashedInto(repoPath, ref.name, comparison))
     {
-      stale.push({ ...entry, reason: REASON_SQUASHED });
+      stale.push({ ...entry, reason: REASON_SQUASHED, needsForce: true });
     }
     else
     {
