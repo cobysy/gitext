@@ -3,13 +3,14 @@
  * Delete local branches whose work has landed. Squash-merged branches need `-D` (no ancestry link),
  * and so does any branch `git branch -d` would judge against a HEAD that is behind the comparison.
  * Dialog shows why each branch is offered, lists kept-back branches, and shows all steps in preview.
- * Merges done on the server only show up after a fetch, so one is a button away.
+ * Merges done on the server only show up after a fetch, so one is offered before the scan.
  */
 
 import { computed, onMounted, ref, watch } from 'vue';
 import { api, toMessage } from '@renderer/api.js';
 import { formatRelativeDate } from '@renderer/format.js';
 import { useDialog, type Step } from '@renderer/composables/useDialog.js';
+import { useUiStore } from '@renderer/stores/ui.js';
 import {
   ALL_REMOTES,
   buildBranchDeleteSteps,
@@ -25,6 +26,7 @@ import { FETCH, REFS } from '@shared/invalidation.js';
 
 const props = defineProps<{ repoPath: string }>();
 const emit = defineEmits<{ close: [] }>();
+const ui = useUiStore();
 const { busy, error, run: runGit, runSteps } = useDialog();
 
 const REASON_LABELS: Record<StaleBranchReason, string> = {
@@ -39,8 +41,9 @@ const branches = ref<{ value: string; label: string }[]>([]);
 const report = ref<BranchCleanupReport | null>(null);
 const picked = ref(new Set<string>());
 const scanning = ref(false);
-const hasRemotes = ref(false);
 const fetching = ref(false);
+/** Set when the fetch failed: the list is then only as fresh as the local refs already were. */
+const staleAfterFetch = ref(false);
 
 /** Every remote, pruned: a branch deleted on the server is what "upstream gone" reads. */
 const fetchArgv = buildPullArgs({ action: PULL_ACTION_FETCH, remote: ALL_REMOTES, prune: true });
@@ -165,59 +168,73 @@ async function run(): Promise<void>
 }
 
 /**
- * What can be compared against. The comparison is only replaced when it no longer exists:
- * a fetch that prunes the branch someone chose is the one time it has to move.
+ * What can be compared against. Choosing one is what starts a scan, through the watcher
+ * below, so this is the last thing the opening sequence does.
  */
 async function loadComparisons(): Promise<void>
 {
-  const [refs, remotes] = await Promise.all([
-    api['refs:list'](props.repoPath),
-    api['remote:list'](props.repoPath)
-  ]);
+  const refs = await api['refs:list'](props.repoPath);
   branches.value = comparisonOptions(refs);
-  hasRemotes.value = remotes.length > 0;
   if (!branches.value.some((option) => option.value === comparison.value))
   {
     comparison.value = defaultComparison(refs);
   }
 }
 
-async function reload(): Promise<void>
+/**
+ * Whether to fetch before scanning. Asked rather than assumed: it is network work that
+ * can prompt for credentials, and pruning deletes refs nobody asked it to. Asked before
+ * the list is drawn rather than beside the delete button, because a fetch changes which
+ * branches are offered and why: one taken after the ticks are made would throw them away.
+ */
+async function askToFetch(): Promise<boolean>
 {
-  const before = comparison.value;
+  const remotes = await api['remote:list'](props.repoPath);
+  if (remotes.length === 0)
+  {
+    return false;
+  }
+  return ui.confirmUnlessSuppressed({
+    title: 'Fetch before cleaning up?',
+    message: 'A branch merged on the server only shows up after `fetch --prune`.',
+    confirmLabel: 'Fetch & Prune',
+    rememberKey: 'branch.cleanupFetch'
+  });
+}
+
+async function open(): Promise<void>
+{
+  // Held up through the question and the fetch as well as the scan: there is nothing to
+  // report until a comparison has been chosen, and the watcher lowers it from here.
+  scanning.value = true;
   try
   {
+    if (await askToFetch())
+    {
+      fetching.value = true;
+      try
+      {
+        staleAfterFetch.value = !(await runGit(fetchArgv, FETCH, { close: false, console: true }));
+      }
+      finally
+      {
+        fetching.value = false;
+      }
+    }
     await loadComparisons();
   }
   catch (e)
   {
     error.value = toMessage(e);
   }
-  // A comparison that changed is rescanned by its watcher; one that did not has new refs
-  // under the same name, and nothing else notices.
-  if (comparison.value === before)
+  // Nothing to compare against, so no scan is coming to lower it.
+  if (!comparison.value)
   {
-    await scan();
+    scanning.value = false;
   }
 }
 
-async function fetchAndPrune(): Promise<void>
-{
-  fetching.value = true;
-  try
-  {
-    if (await runGit(fetchArgv, FETCH, { close: false, console: true }))
-    {
-      await reload();
-    }
-  }
-  finally
-  {
-    fetching.value = false;
-  }
-}
-
-onMounted(reload);
+onMounted(open);
 
 watch(comparison, scan);
 </script>
@@ -232,9 +249,14 @@ watch(comparison, scan);
         hint="Only branches already merged into it."
       />
 
-      <p v-if="scanning" class="placeholder">Checking every local branch…</p>
+      <p v-if="fetching" class="placeholder">Fetching from the remotes…</p>
+      <p v-else-if="scanning" class="placeholder">Checking every local branch…</p>
 
       <template v-else>
+        <p v-if="staleAfterFetch" class="warn">
+          The fetch failed: this list is what your local refs already knew.
+        </p>
+
         <div v-if="stale.length" class="head">
           <span class="count">
             {{ pickedCount }} of {{ stale.length }} selected
@@ -302,10 +324,6 @@ watch(comparison, scan);
     </div>
 
     <template #actions>
-      <button v-if="hasRemotes" :disabled="busy || scanning" @click="fetchAndPrune">
-        {{ fetching ? 'Fetching…' : 'Fetch & Prune' }}
-      </button>
-      <span class="spacer" />
       <button @click="emit('close')">Cancel</button>
       <button class="danger" :disabled="pickedCount === 0 || busy" @click="run">
         {{ deleteLabel }}

@@ -25,6 +25,11 @@ export const CONFIRMATIONS: readonly ConfirmationEntry[] = [
     detail: 'Its commits become unreachable.'
   },
   {
+    key: 'branch.cleanupFetch',
+    label: 'Fetching before cleaning up branches',
+    detail: 'Asked when the cleanup opens; merges done on the server need a fetch.'
+  },
+  {
     key: 'branch.deleteRemote',
     label: 'Deleting a remote branch',
     detail: 'It happens on the server, for everyone.'
