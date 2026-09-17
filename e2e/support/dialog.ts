@@ -255,6 +255,30 @@ export class Dialog
     return this.page.locator('button').filter({ hasText: exactly(text) }).first();
   }
 
+  /**
+   * Answer the in-page confirmation this window is asking, and hand back its label.
+   *
+   * `.scrim .frame` rather than the label: the confirmations are the one dialog still
+   * drawn in the page, and a question raised over a form can share a word with the form
+   * underneath it, which `button()` would find first. The confirming button is the last
+   * of the pair, the way `ConfirmDialog` draws them.
+   */
+  async confirm(accept = true): Promise<string>
+  {
+    const buttons = this.page.locator('.scrim .frame .actions button');
+    await expect(buttons.first(), 'a confirmation to answer').toBeVisible();
+    let button = buttons.first();
+    if (accept)
+    {
+      button = buttons.nth((await buttons.count()) - 1);
+    }
+    const label = ((await button.textContent()) ?? '').trim();
+    await button.dispatchEvent('click');
+    await expect(this.page.locator('.scrim'), 'the confirmation to close').toHaveCount(0);
+    await settle(500);
+    return label;
+  }
+
   /** Click whatever element carries this text: a list row, usually. */
   async clickText(text: string): Promise<void>
   {

@@ -712,6 +712,10 @@ test('set a branch’s upstream, from the panel row it belongs to', async ({ app
  * The merge happens in the bare remote, so before the fetch `origin/main` lacks it and
  * the branch is kept back; after it the branch is offered with its upstream gone. HEAD
  * never contains it, so `-d` would refuse: the preview has to say `-D`.
+ *
+ * The fetch is asked for as the dialog opens, before anything is scanned or ticked, so
+ * both states take a window of their own: declining shows what the local refs knew, and
+ * accepting shows what the server did.
  */
 test('clean up a branch merged on the server, after fetching', async ({ app, repo }, testInfo) =>
 {
@@ -732,11 +736,15 @@ test('clean up a branch merged on the server, after fetching', async ({ app, rep
   repo.git(['update-ref', '-d', 'refs/heads/landed'], origin);
   await refreshApp(app);
 
-  const dialog = await openViaPalette(app, 'Clean Up Merged Branches', 'Clean Up Branches');
-  const keptBack = dialog.page.locator('.kept .item').filter({ hasText: 'landed' });
+  const local = await openViaPalette(app, 'Clean Up Merged Branches', 'Clean Up Branches');
+  await local.confirm(false);
+  const keptBack = local.page.locator('.kept .item').filter({ hasText: 'landed' });
   await expect(keptBack, 'the branch was offered before the fetch showed it landed').toHaveCount(1);
+  await local.click('Cancel');
+  await app.expectFormsClosed();
 
-  await dialog.click('Fetch & Prune');
+  const dialog = await openViaPalette(app, 'Clean Up Merged Branches', 'Clean Up Branches');
+  await dialog.confirm();
   await dialog.tickNamed('landed');
   const preview = await dialog.preview();
   await testInfo.attach('preview', { body: preview });

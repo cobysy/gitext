@@ -309,29 +309,9 @@ export class CommitScreen extends Dialog
     await expect(this.page.locator('.menu'), 'the menu to close').toHaveCount(0);
   }
 
-  /**
-   * Answer the in-page confirmation.
-   *
-   * `.scrim .frame` and not a window: the confirmations are the one dialog still drawn in
-   * the page. Every *operation* dialog is its own window, and the Undo menu's resets open
-   * one: those are answered with `dialogWindowButton` instead.
-   */
-  async confirm(accept = true): Promise<string>
-  {
-    const buttons = this.page.locator('.scrim .frame .actions button');
-    await expect(buttons.first(), 'a confirmation to answer').toBeVisible();
-    const count = await buttons.count();
-    let button = buttons.first();
-    if (accept)
-    {
-      button = buttons.nth(count - 1);
-    }
-    const label = ((await button.textContent()) ?? '').trim();
-    await button.dispatchEvent('click');
-    await expect(this.page.locator('.scrim'), 'the confirmation to close').toHaveCount(0);
-    await settle(500);
-    return label;
-  }
+  // The confirmation this screen's Undo menu raises is answered by `Dialog.confirm`: it
+  // is drawn in the page here exactly as it is over a form. The Undo menu's *resets* open
+  // a window instead, which is what `dialogWindowButton` is for.
 }
 
 /**
