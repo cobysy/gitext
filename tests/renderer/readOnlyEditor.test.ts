@@ -68,7 +68,12 @@ vi.mock('@renderer/monaco.js', () => ({
       setScrollPosition: noop,
       layout: noop,
       dispose: noop,
-      onDidScrollChange: noop
+      onDidScrollChange: noop,
+      onDidChangeHiddenAreas: noop,
+      onDidContentSizeChange: noop,
+      // The collection the pane marks lines through: it holds one from the moment the
+      // editor exists, so a mock without this never gets as far as showing a file.
+      createDecorationsCollection: () => ({ set: noop })
     }),
     createModel: (_text: string, language: string, uri: { value: string }) =>
     {
