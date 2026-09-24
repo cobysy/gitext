@@ -72,13 +72,14 @@ export const filesPaneModeMenu: MenuNode[] = [
 ];
 
 /**
- * The two things the *pane beside* the list can show, drawn as the same kind of switch.
+ * The three things the *pane beside* the list can show, drawn as the same kind of switch.
  * A separate declaration from `filesPaneModeMenu`: a separate question (which list vs.
  * what to know about the pick), rendered in a different header.
  */
 export const filePaneViewMenu: MenuNode[] = [
   item('files.viewDiff'),
-  item('files.viewContents')
+  item('files.viewContents'),
+  item('files.viewBlame')
 ];
 
 /** The file list's own view button: how the list is shaped, not what's in it. Its own menu, not rows on the context menu above, since these act on the list, not the file clicked. */
@@ -88,6 +89,7 @@ export const fileListViewMenu: MenuNode[] = [
   separator,
   item('files.viewDiff'),
   item('files.viewContents'),
+  item('files.viewBlame'),
   separator,
   item('files.viewTree'),
   item('files.viewFlat'),

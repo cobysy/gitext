@@ -42,7 +42,7 @@ export const DIALOG_SETTINGS = {
   // from whatever settings the machine already has, and a step that reads the pane's
   // heading or its diff is asking a question whose answer depends on both of these.
   filesPaneMode: 'changed',
-  filePaneView: 'diff',
+  filePaneView: { changed: 'diff', tree: 'blame' },
   checkoutLocalChanges: 'none',
   // Both switches the "set as default" step *ticks*, pinned rather than inherited. A
   // tick is a toggle, so its result depends on where it started: on a machine whose

@@ -7,6 +7,7 @@
  * - `fileTree/selection.ts`: the listing, and what is picked in it.
  * - `fileTree/listing.ts`: reading the listing for the current endpoint.
  * - `fileTree/blob.ts`: the followed file's contents.
+ * - `fileTree/blame.ts`: who wrote each of its lines.
  */
 
 import { defineStore } from 'pinia';
@@ -17,10 +18,16 @@ import { FILE_STATUS_DELETED } from '@shared/types.js';
 import { useDiffStore } from '@renderer/stores/diff.js';
 import { useFilePaneStore } from '@renderer/stores/filePane.js';
 import { useRepoStore } from '@renderer/stores/repo.js';
-import { FILE_PANE_VIEW_FILE, FILES_PANE_MODE_TREE, useSettingsStore } from '@renderer/stores/settings.js';
+import {
+  FILE_PANE_VIEW_BLAME,
+  FILE_PANE_VIEW_FILE,
+  FILES_PANE_MODE_TREE,
+  useSettingsStore
+} from '@renderer/stores/settings.js';
 import { createSelectionState } from './fileTree/selection.js';
 import { createListingState } from './fileTree/listing.js';
 import { createBlobState } from './fileTree/blob.js';
+import { createBlameState } from './fileTree/blame.js';
 
 const TREE_ENTRY_KIND_BLOB = 'blob';
 const FILE_MODE_DEFAULT = '100644';
@@ -67,6 +74,7 @@ export const useFileTreeStore = defineStore('fileTree', () =>
     selection.reset();
     listing.reset();
     blob.reset();
+    blame.reset();
   }
 
   const listing = createListingState({
@@ -88,7 +96,14 @@ export const useFileTreeStore = defineStore('fileTree', () =>
    * tree is the list: either list can show contents now, so listing and blob are gated
    * separately, or showing contents beside the changed list would drag in a full listing.
    */
-  const showingContents = computed(() => settings.settings.filePaneView === FILE_PANE_VIEW_FILE);
+  const showingContents = computed(() => settings.filePaneView === FILE_PANE_VIEW_FILE);
+
+  /**
+   * Whether anything is showing the blame. Gated on its own for the same reason the
+   * contents are: `git blame` is a subprocess per file, and a pane showing the diff has
+   * no use for one.
+   */
+  const showingBlame = computed(() => settings.filePaneView === FILE_PANE_VIEW_BLAME);
 
   /**
    * The file whose contents to read, from whichever list is being picked from. The
@@ -114,6 +129,12 @@ export const useFileTreeStore = defineStore('fileTree', () =>
     repo,
     endpoint: () => endpoint.value,
     entry: () => contentEntry.value
+  });
+
+  const blame = createBlameState({
+    repo,
+    endpoint: () => endpoint.value,
+    path: () => contentEntry.value?.path ?? null
   });
 
   // Below `blob`, not above: the first run reaches `reset()` when no repository is open
@@ -155,6 +176,18 @@ export const useFileTreeStore = defineStore('fileTree', () =>
     { immediate: true }
   );
 
+  watch(
+    [showingBlame, () => contentEntry.value?.path, contentKey],
+    () =>
+    {
+      if (showingBlame.value)
+      {
+        void blame.loadBlame();
+      }
+    },
+    { immediate: true }
+  );
+
   /**
    * Re-read both, without the endpoint having changed: what the `.git` watcher calls,
    * since working-tree/index listings change as files are saved and staged.
@@ -170,6 +203,10 @@ export const useFileTreeStore = defineStore('fileTree', () =>
     {
       await blob.loadBlob();
     }
+    if (showingBlame.value)
+    {
+      await blame.loadBlame();
+    }
   }
 
   return {
@@ -184,11 +221,15 @@ export const useFileTreeStore = defineStore('fileTree', () =>
     blob: blob.blob,
     blobLoading: blob.blobLoading,
     blobError: blob.blobError,
+    blame: blame.blame,
+    blameLoading: blame.blameLoading,
+    blameError: blame.blameError,
     endpoint,
     endpointKey,
     isEmpty: listing.isEmpty,
     active,
     showingContents,
+    showingBlame,
     contentEntry,
     select: selection.select,
     selectPaths: selection.selectPaths,
@@ -199,6 +240,7 @@ export const useFileTreeStore = defineStore('fileTree', () =>
     reset,
     load: listing.load,
     loadBlob: blob.loadBlob,
+    loadBlame: blame.loadBlame,
     refresh
   };
 });

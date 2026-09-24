@@ -14,15 +14,13 @@ import { runCommand } from '@renderer/commands/registry.js';
 import { useCommandContext } from '@renderer/composables/useCommands.js';
 import { useContextMenu } from '@renderer/composables/useContextMenu.js';
 import { diffOptionsMenu } from '@renderer/menus/fileList.js';
-import { resolveMenu, resolvedCommands } from '@renderer/menus/resolve.js';
+import { resolveMenu } from '@renderer/menus/resolve.js';
 import { useDiffStore } from '@renderer/stores/diff.js';
 import { FILES_PANE_MODE_TREE, useSettingsStore } from '@renderer/stores/settings.js';
 import { useUiStore } from '@renderer/stores/ui.js';
 import ContextMenu from '@renderer/components/ui/ContextMenu.vue';
-import SegmentedSwitch from '@renderer/components/ui/SegmentedSwitch.vue';
-import Glyph from '@renderer/components/ui/Glyph.vue';
 import LineStats from '@renderer/components/ui/LineStats.vue';
-import { filePaneViewMenu } from '@renderer/menus/fileList.js';
+import FilePaneSwitch from '@renderer/components/diff/FilePaneSwitch.vue';
 import { useFilePaneStore } from '@renderer/stores/filePane.js';
 import { useDiffEditorPanes } from './useDiffEditorPanes.js';
 
@@ -34,7 +32,6 @@ const commandContext = useCommandContext();
 
 const DIFF_VIEW_MODE_SIDE_BY_SIDE = 'sideBySide';
 const WHITESPACE_NONE = 'none';
-const COMMAND_ID_VIEW_DIFF = 'files.viewDiff';
 const COMMAND_ID_NEXT_DIFFERENCE = 'diff.nextDifference';
 const COMMAND_ID_PREVIOUS_DIFFERENCE = 'diff.previousDifference';
 const MONACO_TRIGGER_SOURCE_KEYBOARD = 'keyboard';
@@ -50,11 +47,6 @@ function canNavigateToBlock(
 {
   return !!editor && block !== prev && block >= 0;
 }
-
-/** Diff or whole file: the same switch `BlobViewer` draws, in the same place. */
-const viewItems = computed(() =>
-  resolvedCommands(resolveMenu(filePaneViewMenu, commandContext.value))
-);
 
 /** A file picked from the tree that this commit did not touch: not "nothing selected", since the whole-file switch beside this message can still show it. */
 const noDiffForTreeFile = computed(
@@ -268,13 +260,7 @@ function onMenuCommand(id: string): void
         </svg>
       </button>
 
-      <SegmentedSwitch :items="viewItems" @run="onMenuCommand">
-        <template #icon="{ id }">
-          <!-- The diff, or the file itself. -->
-          <Glyph v-if="id === COMMAND_ID_VIEW_DIFF" name="diffFile" />
-          <Glyph v-else name="textFile" />
-        </template>
-      </SegmentedSwitch>
+      <FilePaneSwitch />
 
       <button class="options" title="Diff options" aria-label="Diff options" @click="openOptions">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">

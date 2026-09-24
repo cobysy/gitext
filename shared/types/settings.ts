@@ -14,6 +14,20 @@ export type CommitInfoPosition = 'left' | 'right';
 /** Stroke weight of a graph lane line; see `Settings.graphLineWidth`. */
 export type GraphLineWidth = 'light' | 'normal' | 'heavy';
 
+/** Which list the file pane shows: what the row changed, or what the revision contains. */
+export const FILES_PANE_MODE_CHANGED = 'changed' as const;
+export const FILES_PANE_MODE_TREE = 'tree' as const;
+export type FilesPaneMode = typeof FILES_PANE_MODE_CHANGED | typeof FILES_PANE_MODE_TREE;
+
+/** What the pane beside that list shows about the file picked in it. */
+export const FILE_PANE_VIEW_DIFF = 'diff' as const;
+export const FILE_PANE_VIEW_FILE = 'file' as const;
+export const FILE_PANE_VIEW_BLAME = 'blame' as const;
+export type FilePaneView =
+  | typeof FILE_PANE_VIEW_DIFF
+  | typeof FILE_PANE_VIEW_FILE
+  | typeof FILE_PANE_VIEW_BLAME;
+
 /** How much of a row off the current branch is drawn dimmed; see `Settings.graphDimNonRelatives`. */
 export const GRAPH_DIM_NONE = 'none' as const;
 export const GRAPH_DIM_LANES = 'lanes' as const;
@@ -118,12 +132,15 @@ export interface Settings {
    * Which question the file pane answers: what the row *changed*, or what the repository
    * *contains* there. One pane with a mode, since both are the same paths in the same folders.
    */
-  filesPaneMode: 'changed' | 'tree';
+  filesPaneMode: FilesPaneMode;
   /**
-   * What the pane beside the list shows: the diff, or the file whole. Independent of
-   * `filesPaneMode`; not every combination has an answer (a tree file untouched has no diff).
+   * What the pane beside the list shows, answered once per list: the diff, the file
+   * whole, or who wrote each line of it. One answer per list rather than one for both,
+   * because the two lists are asked different questions: a changed-files row is picked
+   * to see what the commit did to it, while a tree row is picked to read the file, and
+   * most of the tree is untouched by the commit and has no diff to show at all.
    */
-  filePaneView: 'diff' | 'file';
+  filePaneView: Record<FilesPaneMode, FilePaneView>;
   /**
    * Which side of the grid the commit info sits on, never below: it's the grid's
    * companion, exactly as tall. Files and diff stay in the pane below, full width.
@@ -284,7 +301,6 @@ export interface Settings {
 
 export const IGNORE_WHITESPACE_NONE: Settings['diffIgnoreWhitespace'] = 'none';
 export const DIFF_VIEW_SIDE_BY_SIDE: Settings['diffViewMode'] = 'sideBySide';
-export const FILES_PANE_MODE_TREE: Settings['filesPaneMode'] = 'tree';
 export const TOOLBAR_LABELS_NONE: Settings['toolbarLabels'] = 'none';
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -333,10 +349,15 @@ export const DEFAULT_SETTINGS: Settings = {
   leftPanelSortAscending: true,
   // What changed, because that is what a commit is selected to find out. The tree is one
   // click away and remembered once chosen.
-  filesPaneMode: 'changed',
-  // The diff, because a commit is selected to find out what it did. Switching the list to
-  // the tree does not switch this: a tree row's diff is a question worth asking too.
-  filePaneView: 'diff',
+  filesPaneMode: FILES_PANE_MODE_CHANGED,
+  // The changed list gets the diff, because a commit is selected to find out what it did.
+  // The tree gets the blame: a file browsed there is usually one the commit never touched,
+  // so the diff is empty, and the whole file alone says nothing about the revision the
+  // tree is of. Blame answers both at once, the file and who wrote each line of it.
+  filePaneView: {
+    [FILES_PANE_MODE_CHANGED]: FILE_PANE_VIEW_DIFF,
+    [FILES_PANE_MODE_TREE]: FILE_PANE_VIEW_BLAME
+  },
   // Right: the left panel already owns the window's left edge, and reading the commit
   // left of the grid would squeeze history between two narrow columns.
   commitInfoPosition: 'right',
@@ -429,4 +450,42 @@ export function toGraphDimming(dim: unknown, dimText: unknown): GraphDimming
     return GRAPH_DIM_LANES;
   }
   return DEFAULT_SETTINGS.graphDimNonRelatives;
+}
+
+/**
+ * Read a stored `filePaneView` back as one answer per list.
+ *
+ * It was a single value for both lists before, so a config written by an older build
+ * arrives as a bare string. That string becomes the changed list's answer and the tree
+ * takes the current default: the tree's answer is a question that build never asked, so
+ * there is nothing of the user's to carry over to it.
+ */
+export function toFilePaneViews(stored: unknown): Record<FilesPaneMode, FilePaneView>
+{
+  if (isFilePaneView(stored))
+  {
+    return { ...DEFAULT_SETTINGS.filePaneView, [FILES_PANE_MODE_CHANGED]: stored };
+  }
+  const views = stored as Partial<Record<FilesPaneMode, unknown>> | null | undefined;
+  return {
+    [FILES_PANE_MODE_CHANGED]: readView(views?.[FILES_PANE_MODE_CHANGED], FILES_PANE_MODE_CHANGED),
+    [FILES_PANE_MODE_TREE]: readView(views?.[FILES_PANE_MODE_TREE], FILES_PANE_MODE_TREE)
+  };
+}
+
+function isFilePaneView(value: unknown): value is FilePaneView
+{
+  return value === FILE_PANE_VIEW_DIFF
+    || value === FILE_PANE_VIEW_FILE
+    || value === FILE_PANE_VIEW_BLAME;
+}
+
+/** One list's stored answer, or that list's default when there is none to read. */
+function readView(value: unknown, mode: FilesPaneMode): FilePaneView
+{
+  if (isFilePaneView(value))
+  {
+    return value;
+  }
+  return DEFAULT_SETTINGS.filePaneView[mode];
 }

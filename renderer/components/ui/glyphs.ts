@@ -13,7 +13,7 @@
  * a rect is not one of these, and belongs to whichever component wants it.
  */
 
-export type GlyphName = 'diffFile' | 'textFile' | 'folder' | 'stash';
+export type GlyphName = 'diffFile' | 'textFile' | 'blameFile' | 'folder' | 'stash';
 
 export interface Glyph {
   strokeWidth: number;
@@ -30,6 +30,16 @@ export const GLYPHS: Record<GlyphName, Glyph> = {
   textFile: {
     strokeWidth: 1.2,
     paths: ['M4 2.2h5.2L12.5 5.4v8.4H4z', 'M6.2 7.2h4.2M6.2 9.4h4.2M6.2 11.6h2.6']
+  },
+  // The same page with a ruled margin down it and the text pushed off it: a file read
+  // with a column of who wrote each line beside it.
+  blameFile: {
+    strokeWidth: 1.2,
+    paths: [
+      'M4 2.2h5.2L12.5 5.4v8.4H4z',
+      'M6.4 6.4v6.2',
+      'M7.8 7.2h2.8M7.8 9.4h2.8M7.8 11.6h1.8'
+    ]
   },
   // A folder: what the repository contains. Also the browse button's glyph, and a
   // worktree's, which is a folder somewhere else on disk.

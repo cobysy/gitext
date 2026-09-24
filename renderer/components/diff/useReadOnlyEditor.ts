@@ -9,6 +9,16 @@ import { applyMonacoTheme, monacoThemeName } from '@renderer/monaco.js';
 import { LANGUAGE_PLAINTEXT } from '@renderer/monacoLang.js';
 
 
+/**
+ * The editor's line height and the gap it leaves above the first line, in CSS px.
+ *
+ * Exported because a column drawn *beside* one of these panes has to step in the same
+ * units to stay level with the lines it names: `BlamePane` lays its gutter out from
+ * these rather than from a copy of the numbers.
+ */
+export const EDITOR_LINE_HEIGHT = 18;
+export const EDITOR_PADDING_TOP = 4;
+
 export interface ReadOnlyEditorContent {
   text: string;
   language: string;
@@ -25,7 +35,7 @@ export interface ReadOnlyEditorOptions {
   effectiveTheme: () => 'light' | 'dark';
   /** Content to show, null if nothing yet. Re-applied on change. */
   content: () => ReadOnlyEditorContent | null;
-  /** Stable identity for this pane's model, distinct from other panes. */
+  /** This pane's own prefix for its models' URIs, distinct from every other pane's. */
   uriTag: string;
   /** Fires on scroll so caller can sync gutter. */
   onScroll?: (scrollTop: number) => void;
@@ -37,6 +47,8 @@ export function useReadOnlyEditor(opts: ReadOnlyEditorOptions): {
 {
   let editor: monaco.editor.IStandaloneCodeEditor | null = null;
   let resizeObserver: ResizeObserver | null = null;
+  /** Makes each file's model URI its own; see the note where the model is built. */
+  let serial = 0;
 
   function layout(): void
   {
@@ -64,9 +76,9 @@ export function useReadOnlyEditor(opts: ReadOnlyEditorOptions): {
       lineNumbers: 'on',
       renderLineHighlight: 'none',
       fontSize: 12,
-      lineHeight: 18,
+      lineHeight: EDITOR_LINE_HEIGHT,
       fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
-      padding: { top: 4, bottom: 4 },
+      padding: { top: EDITOR_PADDING_TOP, bottom: 4 },
       stickyScroll: { enabled: false },
       contextmenu: false
     });
@@ -106,13 +118,11 @@ export function useReadOnlyEditor(opts: ReadOnlyEditorOptions): {
       {
         return;
       }
+      const previous = editor.getModel();
       if (!c)
       {
-        const model = editor.getModel();
-        if (model)
-        {
-          model.setValue('');
-        }
+        editor.setModel(null);
+        previous?.dispose();
         return;
       }
 
@@ -127,23 +137,17 @@ export function useReadOnlyEditor(opts: ReadOnlyEditorOptions): {
       }
       editor.updateOptions({ wordWrap });
 
-      const uri = monaco.Uri.parse(`gitext://${opts.uriTag}`);
-      let model = monaco.editor.getModel(uri);
-      if (!model)
-      {
-        model = monaco.editor.createModel(c.text, c.language, uri);
-      }
-      else
-      {
-        monaco.editor.setModelLanguage(model, c.language);
-        model.setValue(c.text);
-      }
-      const previous = editor.getModel();
-      editor.setModel(model);
-      if (previous && previous !== model)
-      {
-        previous.dispose();
-      }
+      // A model per file, at a URI of its own, rather than one model told it is a
+      // different language each time. Monaco's language workers take a model on at the
+      // moment it is created and key it by its URI: a model made as Markdown and later
+      // told it is TypeScript is one the TypeScript worker never learned about, so the
+      // first hover over it asks for a file the worker does not have and throws where
+      // nobody can catch it. The serial is what makes the URI new, since the pane shows
+      // one file after another and the old model is not gone until it is disposed.
+      serial += 1;
+      const uri = monaco.Uri.parse(`gitext://${opts.uriTag}/${serial}`);
+      editor.setModel(monaco.editor.createModel(c.text, c.language, uri));
+      previous?.dispose();
       editor.setScrollPosition({ scrollTop: 0, scrollLeft: 0 });
       void Promise.resolve().then(layout);
     },

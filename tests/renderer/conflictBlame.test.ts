@@ -24,7 +24,8 @@ function blame(shas: readonly string[], commits: Record<string, BlameCommitInfo>
   return {
     path: 'file.txt',
     lines: shas.map((sha, index) => ({ sha, origLine: index + 1, finalLine: index + 1, text: '' })),
-    commits
+    commits,
+    binary: false
   };
 }
 

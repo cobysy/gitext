@@ -1,4 +1,5 @@
 import type { BlameCommitInfo, BlameFile, BlameLine } from '@shared/types.js';
+import { BINARY_SNIFF_BYTES } from '../constants.js';
 
 // Blame metadata field keys
 const BLAME_AUTHOR = 'author';
@@ -17,10 +18,29 @@ const BLAME_BOUNDARY = 'boundary';
 const BLAME_LINE_PREFIX = '\t';
 
 /**
+ * A NUL near the start is binary, the same rule `readBlob` reads a file's bytes by.
+ * Applied to the porcelain output rather than to the file: the content lines carry the
+ * file's own bytes, so a binary one puts a NUL within the first few hundred characters,
+ * well inside the window, while no text file has one anywhere.
+ */
+function looksBinary(text: string): boolean
+{
+  return text.slice(0, BINARY_SNIFF_BYTES).includes('\x00');
+}
+
+/**
  * Parse git blame --porcelain (newline-delimited, not NUL; cache metadata by SHA).
+ *
+ * A file that is not text comes back as `binary` with nothing in it: attributing its
+ * bytes a line at a time means nothing, and carrying them anyway would put a megabyte of
+ * junk through the IPC clone for a pane that cannot draw it.
  */
 export function parseBlame(text: string, path: string): BlameFile
 {
+  if (looksBinary(text))
+  {
+    return { path, lines: [], commits: {}, binary: true };
+  }
   const lines: BlameLine[] = [];
   const commits = new Map<string, BlameCommitInfo>();
 
@@ -154,5 +174,5 @@ export function parseBlame(text: string, path: string): BlameFile
     }
   }
 
-  return { path, lines, commits: Object.fromEntries(commits) };
+  return { path, lines, commits: Object.fromEntries(commits), binary: false };
 }

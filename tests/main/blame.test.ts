@@ -8,6 +8,32 @@ const UNCOMMITTED = '0'.repeat(40);
 
 describe('parseBlame', () =>
 {
+  it('refuses a file that is not text, and carries none of its bytes', () =>
+  {
+    // A PNG blames as happily as a source file: git cuts its bytes at every newline that
+    // happens to be in them and attributes each piece. None of that is a line of anything.
+    const text = [
+      `${SHA_A} 1 1 2`,
+      'author Ada Lovelace',
+      'summary Add the logo',
+      'filename logo.png',
+      '\t\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR',
+      `${SHA_A} 2 2`,
+      '\t\x00\x00\x02\x58\x08\x06\x00\x00\x00',
+      ''
+    ].join('\n');
+
+    const result = parseBlame(text, 'logo.png');
+
+    expect(result).toEqual({ path: 'logo.png', lines: [], commits: {}, binary: true });
+  });
+
+  it('says a text file is text, however long', () =>
+  {
+    const text = [`${SHA_A} 1 1 1`, 'author Ada Lovelace', 'filename a.txt', '\tone', ''].join('\n');
+    expect(parseBlame(text, 'a.txt').binary).toBe(false);
+  });
+
   it('reads a single commit blaming every line', () =>
   {
     const text = [
@@ -185,7 +211,12 @@ describe('parseBlame', () =>
 
   it('returns nothing for empty output', () =>
   {
-    expect(parseBlame('', 'a.txt')).toEqual({ path: 'a.txt', lines: [], commits: {} });
+    expect(parseBlame('', 'a.txt')).toEqual({
+      path: 'a.txt',
+      lines: [],
+      commits: {},
+      binary: false
+    });
   });
 });
 

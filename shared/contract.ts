@@ -458,6 +458,12 @@ export interface Invocations {
    * the save dialog was cancelled.
    */
   'diagnostics:save': () => string | null;
+  /**
+   * Write the timeline out unasked, because a window reported something nobody caught.
+   * Goes to the logs directory under a name of its own, one file per run; returns the
+   * path, or null when it could not be written.
+   */
+  'diagnostics:autoSave': () => string | null;
 
   // ── Write operations ─────────────────────────────────────────────────────
   /**
@@ -686,6 +692,7 @@ export const INVOKE_CHANNELS = [
   'log:clear',
   'diagnostics:record',
   'diagnostics:save',
+  'diagnostics:autoSave',
   'git:run',
   'stream:start',
   'stream:cancel',

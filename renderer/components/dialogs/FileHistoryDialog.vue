@@ -24,6 +24,7 @@ import { useDialog } from '@renderer/composables/useDialog.js';
 import { useRepoStore } from '@renderer/stores/repo.js';
 import { useSettingsStore } from '@renderer/stores/settings.js';
 import DialogFrame from '@renderer/components/ui/DialogFrame.vue';
+import BlamePane from '@renderer/components/diff/BlamePane.vue';
 import { useDiffEditorPanes } from '@renderer/components/diff/useDiffEditorPanes.js';
 import { useReadOnlyEditor } from '@renderer/components/diff/useReadOnlyEditor.js';
 
@@ -51,9 +52,6 @@ const emit = defineEmits<{ close: [] }>();
 const repo = useRepoStore();
 const settings = useSettingsStore();
 const { close } = useDialog();
-
-/** git's own sentinel for a locally-modified, uncommitted line. */
-const UNCOMMITTED_SHA = '0'.repeat(40);
 
 // ── The list ────────────────────────────────────────────────────────────────
 
@@ -260,31 +258,8 @@ async function loadBlame(): Promise<void>
   }
 }
 
-/** One row per blamed line: blank on a repeat of the same commit, which is what makes
- * a contiguous run of one commit's lines read as a block rather than as noise. */
-const gutterRows = computed(() =>
-{
-  if (!blame.value)
-  {
-    return [];
-  }
-  const file = blame.value;
-  let lastSha: string | null = null;
-  return file.lines.map((line) =>
-  {
-    const repeat = line.sha === lastSha;
-    lastSha = line.sha;
-    return { sha: line.sha, repeat, commit: file.commits[line.sha] ?? null };
-  });
-});
-
 function selectFromBlameLine(sha: string): void
 {
-  // There is no commit behind an uncommitted line to jump to.
-  if (sha === UNCOMMITTED_SHA)
-  {
-    return;
-  }
   select({ kind: KIND_COMMIT, sha });
 }
 
@@ -306,48 +281,6 @@ async function blamePrevious(): Promise<void>
   {
     select({ kind: KIND_COMMIT, sha: parent.sha });
   }
-}
-
-const blameContainer = ref<HTMLElement | null>(null);
-const gutterEl = ref<HTMLElement | null>(null);
-let syncingScroll = false;
-
-const blamePane = useReadOnlyEditor({
-  host: blameContainer,
-  effectiveTheme: () => settings.effectiveTheme,
-  uriTag: `file-history/blame/${props.filePath}`,
-  content: () =>
-  {
-    if (blame.value)
-    {
-      return { text: blame.value.lines.map((l) => l.text).join('\n'), language: languageForPath(props.filePath) };
-    }
-    else
-    {
-      return null;
-    }
-  },
-  onScroll: (scrollTop) =>
-  {
-    if (syncingScroll || !gutterEl.value)
-    {
-      return;
-    }
-    syncingScroll = true;
-    gutterEl.value.scrollTop = scrollTop;
-    syncingScroll = false;
-  }
-});
-
-function onGutterScroll(): void
-{
-  if (syncingScroll || !gutterEl.value)
-  {
-    return;
-  }
-  syncingScroll = true;
-  blamePane.scrollTo(gutterEl.value.scrollTop);
-  syncingScroll = false;
 }
 
 // ── View tab ────────────────────────────────────────────────────────────────
@@ -493,28 +426,12 @@ watch(
           </div>
 
           <div class="pane blame" :class="{ hidden: activeTab !== TAB_BLAME }">
-            <div ref="gutterEl" class="gutter" @scroll="onGutterScroll">
-              <div
-                v-for="(row, i) in gutterRows"
-                :key="i"
-                class="row"
-                :class="{ uncommitted: row.sha === UNCOMMITTED_SHA }"
-                @click="selectFromBlameLine(row.sha)"
-              >
-                <template v-if="!row.repeat">
-                  <template v-if="row.sha === UNCOMMITTED_SHA">
-                    <span class="who">Uncommitted</span>
-                  </template>
-                  <template v-else>
-                    <span class="who truncate">{{ row.commit?.author }}</span>
-                    <span class="when">
-                      {{ row.commit ? formatCommitDate(row.commit.authorTime, settings.settings.dateFormat) : '' }}
-                    </span>
-                  </template>
-                </template>
-              </div>
-            </div>
-            <div ref="blameContainer" class="monaco fill blame-monaco" />
+            <BlamePane
+              :blame="blame"
+              :path="props.filePath"
+              :uri-tag="`file-history/blame/${props.filePath}`"
+              @pick="selectFromBlameLine"
+            />
             <p v-if="activeTab === TAB_BLAME && blameError" class="placeholder error">
               {{ blameError }}
             </p>
@@ -613,64 +530,6 @@ watch(
 
 .pane.hidden {
   display: none;
-}
-
-/* Beats `.monaco.fill`, which is two classes and would otherwise lay this editor out
-   absolutely over the whole pane, the author gutter included: here the editor is the
-   flex half of a row, not the box it sits in. */
-.pane.blame .blame-monaco {
-  position: relative;
-  inset: auto;
-  flex: 1;
-  min-width: 0;
-}
-
-.gutter {
-  flex: none;
-  width: 220px;
-  overflow-y: scroll;
-  scrollbar-width: none;
-  border-right: 1px solid var(--border-subtle);
-  font-size: var(--text-xs);
-}
-
-.gutter::-webkit-scrollbar {
-  display: none;
-}
-
-.gutter .row {
-  height: 18px;
-  line-height: 18px;
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: 0 var(--space-2);
-  cursor: pointer;
-  white-space: nowrap;
-  overflow: hidden;
-}
-
-.gutter .row:hover {
-  background: var(--bg-subtle);
-}
-
-.gutter .row.uncommitted .who {
-  color: var(--warning);
-}
-
-/* A fixed column rather than a name's own width: the dates beside them then read down
-   the gutter as a column instead of stepping right with each author's name. */
-.gutter .who {
-  color: var(--fg-subtle);
-  flex: none;
-  width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.gutter .when {
-  color: var(--fg-subtle);
-  flex: none;
 }
 
 p.placeholder.error {

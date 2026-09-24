@@ -39,7 +39,7 @@ test.use({
   tourName: 'conflicts',
   seedSettings: {
     filesPaneMode: 'changed',
-    filePaneView: 'diff',
+    filePaneView: { changed: 'diff', tree: 'blame' },
     mergeNoFastForward: false,
     mergeNoCommit: false,
     rebaseAutostash: false
