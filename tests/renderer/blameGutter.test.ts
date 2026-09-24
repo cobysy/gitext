@@ -11,8 +11,12 @@ import type { BlameCommitInfo, BlameFile } from '@shared/types.js';
 import {
   blameGutterRows,
   blameText,
+  evenPlacements,
   gutterWindow,
-  UNCOMMITTED_SHA
+  laidOutPlacements,
+  linesOfCommit,
+  UNCOMMITTED_SHA,
+  type EditorLineLayout
 } from '@renderer/model/blameGutter.js';
 
 function commit(sha: string, author: string): BlameCommitInfo
@@ -61,6 +65,12 @@ describe('blame gutter rows', () =>
     expect(rows.map((row) => row.repeat)).toEqual([false, true, false, false]);
   });
 
+  it('alternates a shade between neighbouring runs, so a blank row still has a block', () =>
+  {
+    const rows = blameGutterRows(blamed(['a', 'a', 'b', 'a', 'a']));
+    expect(rows.map((row) => row.band)).toEqual([true, true, false, true, true]);
+  });
+
   it('carries the commit behind each line, and null when blame named none', () =>
   {
     const file = blamed(['a', 'b']);
@@ -80,6 +90,21 @@ describe('blame gutter rows', () =>
     expect(UNCOMMITTED_SHA).toHaveLength(40);
     const rows = blameGutterRows(blamed([UNCOMMITTED_SHA]));
     expect(rows[0]?.sha).toBe(UNCOMMITTED_SHA);
+  });
+
+  it('gathers every stretch one commit wrote, not just the run being pointed at', () =>
+  {
+    const rows = blameGutterRows(blamed(['a', 'a', 'b', 'a', 'c', 'a']));
+    expect(linesOfCommit(rows, 'a')).toEqual([
+      { first: 0, last: 1 },
+      { first: 3, last: 3 },
+      { first: 5, last: 5 }
+    ]);
+  });
+
+  it('has no stretch to mark for a commit that wrote none of the file', () =>
+  {
+    expect(linesOfCommit(blameGutterRows(blamed(['a'])), 'b')).toEqual([]);
   });
 
   it('joins the lines back into the text the editor shows', () =>
@@ -148,5 +173,87 @@ describe('the stretch of gutter worth drawing', () =>
   {
     // The observer has not reported, so the height is 0: the window is empty, not upside down.
     expect(gutterWindow(500, 0, 0, ROW, PAD, 0).count).toBe(0);
+  });
+});
+
+/**
+ * Where each drawn row goes, once the editor beside the gutter can fold.
+ *
+ * A fold is the case arithmetic cannot survive: the lines it hides are still lines of
+ * the file, so a row per line puts everything below the fold that far down the column
+ * while the text it names has moved up.
+ */
+describe('placing the rows against a folding editor', () =>
+{
+  const ROW = 18;
+  const PAD = 4;
+
+  /**
+   * An editor showing `count` lines with `hidden` folded away inside it.
+   *
+   * It answers the way Monaco does: a hidden line is reported at the top of the line
+   * that hides it, since that is where the fold put it.
+   */
+  function editor(count: number, hidden: { first: number; last: number } | null): EditorLineLayout
+  {
+    function viewLine(line: number): number
+    {
+      if (!hidden || line <= hidden.first)
+      {
+        return line;
+      }
+      if (line <= hidden.last)
+      {
+        return hidden.first;
+      }
+      return line - (hidden.last - hidden.first);
+    }
+    return {
+      visible: [{ first: 0, last: count - 1 }],
+      topOf: (line) => PAD + viewLine(line) * ROW
+    };
+  }
+
+  it('puts a row where the editor put its line', () =>
+  {
+    expect(laidOutPlacements(3, editor(3, null), 0)).toEqual([
+      { line: 0, top: PAD },
+      { line: 1, top: PAD + ROW },
+      { line: 2, top: PAD + 2 * ROW }
+    ]);
+  });
+
+  it('draws no row for a line a fold is hiding, and keeps the one that follows it', () =>
+  {
+    // Lines 2 to 4 are folded into line 1, so line 5 is drawn two rows below it.
+    const placements = laidOutPlacements(6, editor(6, { first: 1, last: 4 }), 0);
+    expect(placements).toEqual([
+      { line: 0, top: PAD },
+      { line: 1, top: PAD + ROW },
+      { line: 5, top: PAD + 2 * ROW }
+    ]);
+  });
+
+  it('keeps overscan rows either side, without running past the file', () =>
+  {
+    const lines: EditorLineLayout = { ...editor(100, null), visible: [{ first: 40, last: 60 }] };
+    const placements = laidOutPlacements(100, lines, 12);
+    expect(placements[0]?.line).toBe(28);
+    expect(placements[placements.length - 1]?.line).toBe(72);
+  });
+
+  it('draws nothing when the editor is showing nothing', () =>
+  {
+    const lines: EditorLineLayout = { visible: [], topOf: () => 0 };
+    expect(laidOutPlacements(10, lines, 12)).toEqual([]);
+  });
+
+  it('steps evenly while the editor has not laid the file out, which is what it will say', () =>
+  {
+    const drawn = gutterWindow(100, 0, 3 * ROW, ROW, PAD, 0);
+    expect(evenPlacements(drawn, ROW)).toEqual(laidOutPlacements(100, {
+      ...editor(100, null),
+      visible: [{ first: 0, last: 2 }]
+    }, 0));
   });
 });

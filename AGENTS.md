@@ -6,7 +6,44 @@
 
 ## Status
 
-**Nothing in flight.** The last piece of work was the file pane's third answer: the
+**Nothing in flight.** The pane has one scroll authority now, which is what a fast scroll
+showed up: the gutter had a scroll of its own that was told where to go, and setting
+`scrollTop` fires that element's `scroll` event a frame later, so every move the editor
+made came back as a stale position and scrolled it part of the way back. The column is
+`overflow: hidden` and translated to the editor's position instead, a wheel over it is
+handed to the editor (`onGutterWheel`, which converts a delta in lines or pages), and
+nothing reads a position the editor did not give. The strings a row draws are worked out
+once per commit as well (`labels`), rather than formatting a date and building a tooltip
+per row per frame.
+
+Hovering the gutter marks the commit's lines in the text as well
+as its rows in the column (`linesOfCommit`, `markLines` on `useReadOnlyEditor`), so the
+two are one band across the pane: a mark that stopped at the column's edge named the
+lines without showing them. The class goes on the line and on its margin both, since
+`isWholeLine` stops at the text and the line-number column would otherwise be a white
+stripe through the middle of it, and it is defined in an unscoped style block because
+Monaco builds those lines outside Vue's render tree.
+
+The gutter also follows the editor's own layout now, which is what
+folding needs: it asks the pane where each line ended up (`lineLayout` on
+`useReadOnlyEditor`, `laidOutPlacements`) rather than counting rows at the line height,
+and redraws when the editor says it has moved them (`onRelayout`, off Monaco's hidden
+areas and content size). A line inside a fold is reported at the top of the line that
+hides it, so the rows walk the range and keep only those that moved on: that drops a
+fold's insides without being told where the folds are. The even step is still computed,
+for the frame before the editor has laid anything out, and the two agree with nothing
+folded.
+
+Before that, reading the blame gutter: a run of one
+commit is named on its first row and blank below it, so neighbouring runs now alternate
+in shade (`band` on a `BlameGutterRow`), a rule marks where one takes over from the last,
+and hovering a line marks every line the same commit wrote, wherever else in the file it
+wrote one. Each named row carries the short SHA beside the author and date, and the row's
+tooltip is the whole commit. The rule and the mark are inset shadows: a border is a pixel
+of height, and a gutter row a pixel taller than the editor's line slides a long file out
+of step with the text it names.
+
+Before that, the file pane's third answer: the
 blame. `BlameViewer` draws it in the repository window the way `DiffViewer` and
 `BlobViewer` draw theirs, over the `BlamePane` the file history window's Blame tab now
 shares, and clicking a line there selects the commit that wrote it. `filePaneView` holds

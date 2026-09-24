@@ -5,6 +5,7 @@
 
 import { onMounted, onUnmounted, watch, type Ref } from 'vue';
 import * as monaco from '@renderer/monaco.js';
+import type { EditorLineLayout, LineRange } from '@renderer/model/blameGutter.js';
 import { applyMonacoTheme, monacoThemeName } from '@renderer/monaco.js';
 import { LANGUAGE_PLAINTEXT } from '@renderer/monacoLang.js';
 
@@ -39,13 +40,22 @@ export interface ReadOnlyEditorOptions {
   uriTag: string;
   /** Fires on scroll so caller can sync gutter. */
   onScroll?: (scrollTop: number) => void;
+  /**
+   * Fires when the editor has moved its lines without being scrolled: a fold opening or
+   * closing, or the content growing. A column drawn beside the pane reads `lineLayout`
+   * again from here, since nothing it holds itself would have changed.
+   */
+  onRelayout?: () => void;
 }
 
 export function useReadOnlyEditor(opts: ReadOnlyEditorOptions): {
   scrollTo: (scrollTop: number) => void;
+  lineLayout: () => EditorLineLayout | null;
+  markLines: (ranges: LineRange[], className: string) => void;
 }
 {
   let editor: monaco.editor.IStandaloneCodeEditor | null = null;
+  let marks: monaco.editor.IEditorDecorationsCollection | null = null;
   let resizeObserver: ResizeObserver | null = null;
   /** Makes each file's model URI its own; see the note where the model is built. */
   let serial = 0;
@@ -83,6 +93,8 @@ export function useReadOnlyEditor(opts: ReadOnlyEditorOptions): {
       contextmenu: false
     });
 
+    marks = editor.createDecorationsCollection([]);
+
     resizeObserver = new ResizeObserver(layout);
     resizeObserver.observe(opts.host.value);
 
@@ -91,10 +103,18 @@ export function useReadOnlyEditor(opts: ReadOnlyEditorOptions): {
       const onScroll = opts.onScroll;
       editor.onDidScrollChange((e) => onScroll(e.scrollTop));
     }
+
+    if (opts.onRelayout)
+    {
+      const onRelayout = opts.onRelayout;
+      editor.onDidChangeHiddenAreas(onRelayout);
+      editor.onDidContentSizeChange(onRelayout);
+    }
   }
 
   function destroyEditor(): void
   {
+    marks = null;
     resizeObserver?.disconnect();
     resizeObserver = null;
     editor?.getModel()?.dispose();
@@ -154,7 +174,50 @@ export function useReadOnlyEditor(opts: ReadOnlyEditorOptions): {
     { immediate: true }
   );
 
+  /**
+   * Where the editor has put the lines, for a column drawn beside it.
+   *
+   * Monaco counts lines from one and this app's gutter counts rows from zero, so the
+   * conversion is here: it is the one module that talks to the editor.
+   */
+  function lineLayout(): EditorLineLayout | null
+  {
+    const ed = editor;
+    if (!ed || !ed.getModel())
+    {
+      return null;
+    }
+    return {
+      visible: ed.getVisibleRanges().map((range) => ({
+        first: range.startLineNumber - 1,
+        last: range.endLineNumber - 1
+      })),
+      topOf: (line: number) => ed.getTopForLineNumber(line + 1)
+    };
+  }
+
+  /**
+   * Draws a whole-line mark on these stretches of the file, replacing the last lot.
+   *
+   * The class goes on the line and on its margin both: `isWholeLine` stops at the text,
+   * so without the margin the line-number column is a white stripe through the middle of
+   * the mark. The class is the caller's, and has to be defined in an unscoped style
+   * block: Monaco builds these lines itself, outside Vue's render tree, so a scoped
+   * block's attribute is on nothing they carry.
+   */
+  function markLines(ranges: LineRange[], className: string): void
+  {
+    marks?.set(
+      ranges.map((range) => ({
+        range: new monaco.Range(range.first + 1, 1, range.last + 1, 1),
+        options: { isWholeLine: true, className, marginClassName: className }
+      }))
+    );
+  }
+
   return {
-    scrollTo: (scrollTop: number) => editor?.setScrollTop(scrollTop)
+    scrollTo: (scrollTop: number) => editor?.setScrollTop(scrollTop),
+    lineLayout,
+    markLines
   };
 }
