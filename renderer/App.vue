@@ -8,7 +8,7 @@
 
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { api, toMessage } from '@renderer/api.js';
-import { reportUnhandledTo } from '@renderer/diagnostics.js';
+import { reportSavedTo, reportUnhandledTo } from '@renderer/diagnostics.js';
 import { registerCommands } from '@renderer/commands/index.js';
 import { useAfterGitOperation } from '@renderer/composables/useAfterGitOperation.js';
 import { useCommands } from '@renderer/composables/useCommands.js';
@@ -25,13 +25,19 @@ import { useRepoObjectsStore } from '@renderer/stores/repoObjects.js';
 import { useRepoStore } from '@renderer/stores/repo.js';
 import { useRevisionsStore } from '@renderer/stores/revisions.js';
 import { useSelectionStore } from '@renderer/stores/selection.js';
-import { FILE_PANE_VIEW_FILE, resolveTheme, useSettingsStore } from '@renderer/stores/settings.js';
+import {
+  FILE_PANE_VIEW_BLAME,
+  FILE_PANE_VIEW_FILE,
+  resolveTheme,
+  useSettingsStore
+} from '@renderer/stores/settings.js';
 import { useUiStore } from '@renderer/stores/ui.js';
 
 import CommitDetails from '@renderer/components/details/CommitDetails.vue';
 import ChangedFiles from '@renderer/components/filelist/ChangedFiles.vue';
 import DiffViewer from '@renderer/components/diff/DiffViewer.vue';
 import BlobViewer from '@renderer/components/diff/BlobViewer.vue';
+import BlameViewer from '@renderer/components/diff/BlameViewer.vue';
 import LeftPanel from '@renderer/components/leftpanel/LeftPanel.vue';
 import LeftPanelRail from '@renderer/components/leftpanel/LeftPanelRail.vue';
 import RevisionGrid from '@renderer/components/revisiongrid/RevisionGrid.vue';
@@ -155,6 +161,9 @@ onMounted(async () =>
   // file the user will never open, and visibly nothing at all. The repository window is
   // the one with a toast stack, so it is the one that shows them.
   reportUnhandledTo((message) => ui.toast(message, 'error'));
+  // Said once a run, after the error itself: the report is no use to anyone who cannot
+  // find it, and by the time the toast is read the window may be the only thing that knows.
+  reportSavedTo((path) => ui.toast(`Diagnostics saved to ${path}`, 'info'));
 
   // Everything in here runs before `ready` flips, and `ready` gates the whole window. A
   // rejection anywhere (an unreadable settings file, a command log that will not load)
@@ -398,10 +407,12 @@ onUnmounted(() =>
                 <ChangedFiles />
               </div>
               <PaneSplitter :pane="fileListPane" />
-              <!-- The second column answers one of two questions about the first's
-                   selection: what changed, or what's here. Its own setting, not the
-                   list's: a tree row's diff is worth seeing, a changed file worth reading whole. -->
-              <BlobViewer v-if="settingsStore.settings.filePaneView === FILE_PANE_VIEW_FILE" />
+              <!-- The second column answers one of three questions about the first's
+                   selection: what changed, what's here, or who wrote it. The answer is
+                   remembered per list, so the tree opens on the blame and the changed
+                   list on the diff, and either can be told otherwise. -->
+              <BlobViewer v-if="settingsStore.filePaneView === FILE_PANE_VIEW_FILE" />
+              <BlameViewer v-else-if="settingsStore.filePaneView === FILE_PANE_VIEW_BLAME" />
               <DiffViewer v-else />
             </div>
           </template>

@@ -115,6 +115,49 @@ export function reportUnhandledTo(sink: (message: string) => void): void
   report = sink;
 }
 
+/** Told where the run's error report went, the first time one is written. */
+let reportSaved: ((path: string) => void) | null = null;
+
+/** Say where the report was saved, once per run: see `saveReport`. */
+export function reportSavedTo(sink: (path: string) => void): void
+{
+  reportSaved = sink;
+}
+
+/** Whether this window has already said where the report is. */
+let savedAnnounced = false;
+
+/**
+ * Put the timeline on disk, because the toast about to appear is all the user gets
+ * otherwise: it is gone in seconds, and the timeline behind it dies with the window.
+ *
+ * Fire-and-forget like everything else here, and announced once: a failure that repeats
+ * rewrites the same file, and a toast per write would bury the errors it is about.
+ */
+function saveReport(): void
+{
+  try
+  {
+    void api['diagnostics:autoSave']()
+      .then((path) =>
+      {
+        if (path && !savedAnnounced)
+        {
+          savedAnnounced = true;
+          reportSaved?.(path);
+        }
+      })
+      .catch(() =>
+      {
+        /* A window that cannot save its report still showed the error, which is the point. */
+      });
+  }
+  catch
+  {
+    /* Same, for a throw on the way in rather than on the way back. */
+  }
+}
+
 export function installDiagnostics(): void
 {
   observeCommands(noteCommandRun);
@@ -128,6 +171,7 @@ export function installDiagnostics(): void
     }
     send(DIAGNOSTIC_ERROR, `${windowName()}: ${event.message}`, linesOf(stack));
     report?.(event.message);
+    saveReport();
   });
 
   window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) =>
@@ -146,5 +190,6 @@ export function installDiagnostics(): void
     }
     send(DIAGNOSTIC_ERROR, `${windowName()} (unhandled rejection): ${message}`, linesOf(stack));
     report?.(message);
+    saveReport();
   });
 }

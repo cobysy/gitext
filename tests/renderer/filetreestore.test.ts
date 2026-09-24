@@ -97,7 +97,7 @@ function showContents(mode: 'tree' | 'changed'): void
 {
   const settings = useSettingsStore();
   settings.settings.filesPaneMode = mode;
-  settings.settings.filePaneView = 'file';
+  settings.settings.filePaneView = { ...settings.settings.filePaneView, [mode]: 'file' };
 }
 
 async function openRepoAt(sha: string): Promise<void>

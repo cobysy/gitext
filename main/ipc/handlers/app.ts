@@ -14,7 +14,12 @@ import {
   getCommandLog,
   setCommandLogDepth
 } from '@main/git/runner.js';
-import { buildReport, noteSettingsChange, record } from '@main/diagnostics/index.js';
+import {
+  buildReport,
+  noteSettingsChange,
+  record,
+  writeErrorReport
+} from '@main/diagnostics/index.js';
 import { getSettings, patchSettings } from '@main/settings.js';
 import {
   broadcast,
@@ -91,6 +96,10 @@ export function registerAppHandlers(): void
     }
     record(kind, text, extra);
   });
+
+  // No dialog and no question: the window that calls this has already lost an error, and
+  // the point is that the timeline is on disk before anyone thinks to ask for it.
+  handle('diagnostics:autoSave', () => writeErrorReport(getSettings().redactDiagnostics));
 
   handle('diagnostics:save', async () =>
   {

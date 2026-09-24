@@ -6,7 +6,26 @@
 
 ## Status
 
-**Nothing in flight.** The last piece of work was *Clean Up Branches* asking about the
+**Nothing in flight.** The last piece of work was the file pane's third answer: the
+blame. `BlameViewer` draws it in the repository window the way `DiffViewer` and
+`BlobViewer` draw theirs, over the `BlamePane` the file history window's Blame tab now
+shares, and clicking a line there selects the commit that wrote it. `filePaneView` holds
+one answer per list rather than one for both (`toFilePaneViews` reads an older config's
+single value back), so the tree opens on the blame and the changed list on the diff: a
+tree row is usually a file the commit never touched, where the diff has nothing to say.
+A file that is not text is refused in the parser (`parseBlame` answers `binary` with
+nothing in it), and the gutter draws only the rows in view inside a box the file's height
+(`gutterWindow`): one element per line was 8,420 of them for `package-lock.json`.
+
+A read-only pane builds a **model per file** now, at a URI of its own, rather than keeping
+one and telling it a different language (`useReadOnlyEditor`). Monaco's language workers
+take a model on when it is created and key it by URI, so a model made as Markdown and
+later called TypeScript was one the TypeScript worker never registered: the first hover
+threw `Could not find source file` out of a web worker. An uncaught error also writes the
+timeline to `~/Library/Logs/gitext/` by itself now (`writeErrorReport`, one file per run,
+rewritten), since the toast is gone in seconds and the timeline dies with the window.
+
+Before that, *Clean Up Branches* asking about the
 fetch instead of offering a button for it. Opening the dialog asks *Fetch before cleaning
 up?* (`branch.cleanupFetch`, suppressible like every other confirmation) and runs
 `fetch --prune --all` in a console window before the first scan. Asked there rather than

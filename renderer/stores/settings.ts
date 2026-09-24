@@ -8,19 +8,30 @@ import { computed, ref } from 'vue';
 import { normalizeSuppressions } from '@shared/confirmations.js';
 import {
   DEFAULT_SETTINGS,
+  FILE_PANE_VIEW_BLAME,
+  FILE_PANE_VIEW_DIFF,
+  FILE_PANE_VIEW_FILE,
+  FILES_PANE_MODE_CHANGED,
   FILES_PANE_MODE_TREE,
   THEME_DARK,
   THEME_LIGHT,
   THEME_SYSTEM,
+  type FilePaneView,
   type Settings,
   type ThemePreference
 } from '@shared/types.js';
 import { api } from '@renderer/api.js';
 
-export { FILES_PANE_MODE_TREE, THEME_DARK, THEME_LIGHT, THEME_SYSTEM };
-
-// `settings.filePaneView`: what the second column beside it shows.
-export const FILE_PANE_VIEW_FILE = 'file';
+export {
+  FILE_PANE_VIEW_BLAME,
+  FILE_PANE_VIEW_DIFF,
+  FILE_PANE_VIEW_FILE,
+  FILES_PANE_MODE_CHANGED,
+  FILES_PANE_MODE_TREE,
+  THEME_DARK,
+  THEME_LIGHT,
+  THEME_SYSTEM
+};
 // `settings.branchScope`: how much of the history the grid loads.
 export const BRANCH_SCOPE_CURRENT = 'current';
 export const BRANCH_SCOPE_FILTERED = 'filtered';
@@ -85,6 +96,23 @@ export const useSettingsStore = defineStore('settings', () =>
     document.documentElement.dataset.theme = theme;
   }
 
+  /**
+   * What the pane beside the file list is showing, for whichever list the pane has.
+   * `settings.filePaneView` holds one answer per list, and nothing outside this store
+   * should have to remember which of the two to read.
+   */
+  const filePaneView = computed<FilePaneView>(
+    () => settings.value.filePaneView[settings.value.filesPaneMode]
+  );
+
+  /** Answer the pane's question for the list it is beside, leaving the other list's alone. */
+  async function setFilePaneView(view: FilePaneView): Promise<void>
+  {
+    await patch({
+      filePaneView: { ...settings.value.filePaneView, [settings.value.filesPaneMode]: view }
+    });
+  }
+
   /** The suppressed questions, reconciled: see `shared/confirmations.ts`. */
   const suppressions = computed(() => normalizeSuppressions(settings.value.confirmSuppressions));
 
@@ -110,7 +138,9 @@ export const useSettingsStore = defineStore('settings', () =>
   return {
     settings,
     effectiveTheme,
+    filePaneView,
     suppressions,
+    setFilePaneView,
     load,
     patch,
     apply,

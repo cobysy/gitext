@@ -9,12 +9,7 @@ import {
   useReadOnlyEditor,
   type ReadOnlyEditorContent
 } from '@renderer/components/diff/useReadOnlyEditor.js';
-import { runCommand } from '@renderer/commands/registry.js';
-import { useCommandContext } from '@renderer/composables/useCommandContext.js';
-import { filePaneViewMenu } from '@renderer/menus/fileList.js';
-import { resolveMenu, resolvedCommands } from '@renderer/menus/resolve.js';
-import SegmentedSwitch from '@renderer/components/ui/SegmentedSwitch.vue';
-import Glyph from '@renderer/components/ui/Glyph.vue';
+import FilePaneSwitch from '@renderer/components/diff/FilePaneSwitch.vue';
 import { useDiffStore } from '@renderer/stores/diff.js';
 import { useFilePaneStore } from '@renderer/stores/filePane.js';
 import { useFileTreeStore } from '@renderer/stores/fileTree.js';
@@ -27,19 +22,6 @@ const tree = useFileTreeStore();
 const diff = useDiffStore();
 const filePane = useFilePaneStore();
 const settings = useSettingsStore();
-const commandContext = useCommandContext();
-
-const COMMAND_ID_VIEW_DIFF = 'files.viewDiff';
-
-/** Diff or whole file switch. */
-const viewItems = computed(() =>
-  resolvedCommands(resolveMenu(filePaneViewMenu, commandContext.value))
-);
-
-function onMenuCommand(id: string): void
-{
-  void runCommand(id, commandContext.value);
-}
 
 /**
  * Path from tree selection or changed list. Latter case: pane couldn't
@@ -123,13 +105,7 @@ const lineCount = computed(() =>
         {{ formatBytes(tree.blob.size) }}
       </span>
 
-      <SegmentedSwitch :items="viewItems" @run="onMenuCommand">
-        <template #icon="{ id }">
-          <!-- The same pair `DiffViewer` draws: the diff, and the file itself. -->
-          <Glyph v-if="id === COMMAND_ID_VIEW_DIFF" name="diffFile" />
-          <Glyph v-else name="textFile" />
-        </template>
-      </SegmentedSwitch>
+      <FilePaneSwitch />
     </header>
 
     <p v-if="tree.blobError" class="placeholder error">{{ tree.blobError }}</p>

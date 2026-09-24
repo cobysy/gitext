@@ -45,4 +45,11 @@ export interface BlameFile {
   lines: BlameLine[];
   /** Keyed by sha: plain object survives structured clone unlike Map. */
   commits: Record<string, BlameCommitInfo>;
+  /**
+   * The file is not text, so there is nothing to attribute a line at a time: `lines` and
+   * `commits` are empty. git blames a PNG as happily as a source file and answers with
+   * its bytes cut at every newline that happens to be in them, which is neither readable
+   * nor a line of anything.
+   */
+  binary: boolean;
 }

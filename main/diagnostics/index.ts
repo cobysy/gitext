@@ -281,25 +281,63 @@ export function buildReport(redact: boolean, jsonl = false): string
 }
 
 /**
- * Write the timeline out because the app is going down.
+ * Write the timeline to a named file in the logs directory, and answer where it went.
  *
- * The one case an in-memory ring cannot serve on its own, and the one that matters most:
- * a crash is exactly when nobody is left to press "Save Diagnostics…". Synchronous on
- * purpose, since the process may not survive the next tick.
+ * Synchronous on purpose: the callers are a crash handler, which may not survive the next
+ * tick, and an error report, which is worth having on disk before whatever went wrong
+ * goes further.
  */
-export function writeCrashReport(redact: boolean): string | null
+function writeReport(redact: boolean, name: string): string | null
 {
   try
   {
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const file = join(app.getPath('logs'), `gitext-crash-${stamp}.txt`);
+    const file = join(app.getPath('logs'), name);
     mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, buildReport(redact), 'utf8');
     return file;
   }
   catch
   {
-    // A crash handler that throws replaces one unreadable failure with another.
+    // A handler that throws replaces one unreadable failure with another.
     return null;
   }
+}
+
+function fileStamp(): string
+{
+  return new Date().toISOString().replace(/[:.]/g, '-');
+}
+
+/**
+ * Write the timeline out because the app is going down.
+ *
+ * The one case an in-memory ring cannot serve on its own, and the one that matters most:
+ * a crash is exactly when nobody is left to press "Save Diagnostics…".
+ */
+export function writeCrashReport(redact: boolean): string | null
+{
+  return writeReport(redact, `gitext-crash-${fileStamp()}.txt`);
+}
+
+/** The run's error report, named once and rewritten after that; see `writeErrorReport`. */
+let errorReportName = '';
+
+/**
+ * Write the timeline out because a window reported something nobody caught.
+ *
+ * An uncaught error raises a toast, and a toast is gone in seconds while the timeline
+ * behind it dies with the window: by the time anyone thinks to press "Save Diagnostics…"
+ * the app has usually been restarted. So the report saves itself.
+ *
+ * One file per run, rewritten each time rather than a fresh one per error: the timeline
+ * only grows, so the newest write already contains every earlier one, and a file each
+ * would leave a directory of near-identical reports after a single bad loop.
+ */
+export function writeErrorReport(redact: boolean): string | null
+{
+  if (!errorReportName)
+  {
+    errorReportName = `gitext-error-${fileStamp()}.txt`;
+  }
+  return writeReport(redact, errorReportName);
 }

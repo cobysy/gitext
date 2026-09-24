@@ -8,12 +8,15 @@ import { GROUP_VIEW_EXTENSION, GROUP_VIEW_STATUS } from '@renderer/model/fileGro
 import { useDiffStore } from '@renderer/stores/diff.js';
 import { useFilePaneStore } from '@renderer/stores/filePane.js';
 import { useFileTreeStore } from '@renderer/stores/fileTree.js';
-import { useSettingsStore } from '@renderer/stores/settings.js';
+import {
+  FILE_PANE_VIEW_BLAME,
+  FILE_PANE_VIEW_DIFF,
+  FILE_PANE_VIEW_FILE,
+  useSettingsStore
+} from '@renderer/stores/settings.js';
 
 const PANE_MODE_CHANGED = 'changed';
 const PANE_MODE_TREE = 'tree';
-const PANE_VIEW_DIFF = 'diff';
-const PANE_VIEW_FILE = 'file';
 const LIST_VIEW_TREE = 'tree';
 const LIST_VIEW_FLAT = 'flat';
 const FILE_SOURCE_WORKING_TREE = 'workingTree';
@@ -73,16 +76,18 @@ export function registerFileListCommands(): void
     run: () => useSettingsStore().patch({ filesPaneMode: PANE_MODE_TREE })
   });
 
-  // Second question (independent from the mode above): all four combinations mean something.
+  // Second question (independent from the mode above): every combination means something.
   // Labels name the answer ("Diff" alone would be indistinguishable from the Diff menu).
+  // Each answers for the list the pane is beside, which is what `setFilePaneView` reads:
+  // the tree and the changed list remember their own.
   defineCommand({
     id: 'files.viewDiff',
     radioGroup: 'files.pane',
     label: 'Show the Diff',
     group: 'Files',
     when: hasRepo,
-    checked: () => useSettingsStore().settings.filePaneView === PANE_VIEW_DIFF,
-    run: () => useSettingsStore().patch({ filePaneView: PANE_VIEW_DIFF })
+    checked: () => useSettingsStore().filePaneView === FILE_PANE_VIEW_DIFF,
+    run: () => useSettingsStore().setFilePaneView(FILE_PANE_VIEW_DIFF)
   });
 
   defineCommand({
@@ -91,8 +96,18 @@ export function registerFileListCommands(): void
     label: 'Show the Whole File',
     group: 'Files',
     when: hasRepo,
-    checked: () => useSettingsStore().settings.filePaneView === PANE_VIEW_FILE,
-    run: () => useSettingsStore().patch({ filePaneView: PANE_VIEW_FILE })
+    checked: () => useSettingsStore().filePaneView === FILE_PANE_VIEW_FILE,
+    run: () => useSettingsStore().setFilePaneView(FILE_PANE_VIEW_FILE)
+  });
+
+  defineCommand({
+    id: 'files.viewBlame',
+    radioGroup: 'files.pane',
+    label: 'Show Who Wrote Each Line',
+    group: 'Files',
+    when: hasRepo,
+    checked: () => useSettingsStore().filePaneView === FILE_PANE_VIEW_BLAME,
+    run: () => useSettingsStore().setFilePaneView(FILE_PANE_VIEW_BLAME)
   });
 
   // A two-way selector like the grid's branch scope, not two toggles: one setting with

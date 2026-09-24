@@ -6,7 +6,12 @@
 import { app } from 'electron';
 import { readFileSync, writeFileSync, renameSync, mkdirSync, existsSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { DEFAULT_SETTINGS, toGraphDimming, type Settings } from '@shared/types.js';
+import {
+  DEFAULT_SETTINGS,
+  toFilePaneViews,
+  toGraphDimming,
+  type Settings
+} from '@shared/types.js';
 
 const CONFIG_FILE_NAME = 'config.json';
 const ENCODING_UTF8 = 'utf8';
@@ -28,7 +33,7 @@ export function loadSettings(): Settings
   try
   {
     const raw = readFileSync(configPath(), ENCODING_UTF8);
-    // Reconcile shape changes (one field changed format). Doing this once at load
+    // Reconcile shape changes (two fields changed format). Doing this once at load
     // lets every window rely on a single current shape.
     const parsed = JSON.parse(raw) as Partial<Settings> & { graphDimNonRelativesText?: unknown };
     // Merge over defaults so a config written by an older build stays valid.
@@ -38,7 +43,8 @@ export function loadSettings(): Settings
       graphDimNonRelatives: toGraphDimming(
         parsed.graphDimNonRelatives,
         parsed.graphDimNonRelativesText
-      )
+      ),
+      filePaneView: toFilePaneViews(parsed.filePaneView)
     };
   }
   catch
