@@ -6,7 +6,13 @@
 
 ## Status
 
-**Nothing in flight.** The pane has one scroll authority now, which is what a fast scroll
+**Nothing in flight.** A typed branch name is used tidied, not only shown tidied:
+`useBranchNameField` gives Create and Rename Branch the typed text and the name the
+preview, the check and the run read, so Enter pressed inside the field no longer sends
+git the raw text. What a space becomes is a choice in Advanced (`normaliseBranchSymbol`,
+`_` or `-`).
+
+Before that, the pane got one scroll authority, which is what a fast scroll
 showed up: the gutter had a scroll of its own that was told where to go, and setting
 `scrollTop` fires that element's `scroll` event a frame later, so every move the editor
 made came back as a stale position and scrolled it part of the way back. The column is
