@@ -2,8 +2,11 @@
 /** Settings trading safety or feedback for speed. */
 
 import FormNumber from '@renderer/components/ui/FormNumber.vue';
+import { computed } from 'vue';
 import FormCheck from '@renderer/components/ui/FormCheck.vue';
-import { flag, number } from './fields.js';
+import FormRadioGroup from '@renderer/components/ui/FormRadioGroup.vue';
+import FormRow from '@renderer/components/ui/FormRow.vue';
+import { choice, flag, number } from './fields.js';
 
 const commandLogDepth = number('commandLogDepth');
 const redactDiagnostics = flag('redactDiagnostics');
@@ -15,6 +18,13 @@ const checkoutAlwaysShowDialog = flag('checkoutAlwaysShowDialog');
 const checkoutUseDefaultLocalChanges = flag('checkoutUseDefaultLocalChanges');
 const autoStashUntracked = flag('autoStashUntracked');
 const normaliseBranchNames = flag('normaliseBranchNames');
+const normaliseBranchSymbol = choice('normaliseBranchSymbol');
+
+/** What a space, or any other character git refuses, becomes in a typed branch name. */
+const BRANCH_SYMBOLS = computed(() => [
+  { value: '_', label: 'Underscore `_`', disabled: !normaliseBranchNames.value },
+  { value: '-', label: 'Hyphen `-`', disabled: !normaliseBranchNames.value }
+]);
 </script>
 
 <template>
@@ -73,7 +83,10 @@ const normaliseBranchNames = flag('normaliseBranchNames');
     <FormCheck
       v-model="normaliseBranchNames"
       label="Tidy typed branch names"
-      hint="A space becomes an underscore, and so on."
+      hint="Spaces and other characters git refuses are replaced."
     />
+    <FormRow label="Replace them with">
+      <FormRadioGroup v-model="normaliseBranchSymbol" :options="BRANCH_SYMBOLS" inline />
+    </FormRow>
   </div>
 </template>

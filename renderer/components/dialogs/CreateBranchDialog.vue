@@ -6,11 +6,10 @@
 import { computed, ref, watch } from 'vue';
 import { api } from '@renderer/api.js';
 import { buildCreateBranchSteps } from '@renderer/model/args/branch.js';
-import { normaliseBranchName } from '@renderer/model/branchName.js';
 import { suggestedBranchNameAt } from '@renderer/model/localBranchName.js';
 import { useRepoStore } from '@renderer/stores/repo.js';
 import { useRepoObjectsStore } from '@renderer/stores/repoObjects.js';
-import { useSettingsStore } from '@renderer/stores/settings.js';
+import { useBranchNameField } from '@renderer/composables/useBranchNameField.js';
 import { useDialog } from '@renderer/composables/useDialog.js';
 import DialogFrame from '@renderer/components/ui/DialogFrame.vue';
 import FormCheck from '@renderer/components/ui/FormCheck.vue';
@@ -30,10 +29,9 @@ const emit = defineEmits<{ close: [] }>();
 
 const repo = useRepoStore();
 const objects = useRepoObjectsStore();
-const settings = useSettingsStore();
 const { busy, error, runSteps } = useDialog();
 
-const name = ref('');
+const { typed, name: tidied, hint: nameHint, commit: normalise } = useBranchNameField();
 const startPoint = ref(props.startPoint ?? 'HEAD');
 const checkout = ref(true);
 const orphan = ref(false);
@@ -91,30 +89,12 @@ watch(
     const suggestion = suggestedBranchNameAt(rev, objects.refs);
     if (suggestion)
     {
-      name.value = suggestion;
+      typed.value = suggestion;
     }
   },
   { immediate: true }
 );
 
-/**
- * Normalised when the field is left, not while it is being typed in.
- *
- * On every keystroke it would fight the caret: typing `fix: x` would become `fix_` before
- * the space was reached.
- */
-function normalise(): void
-{
-  if (!settings.settings.normaliseBranchNames)
-  {
-    return;
-  }
-  name.value = normaliseBranchName(name.value, {
-    token: settings.settings.normaliseBranchSymbol
-  });
-}
-
-const trimmed = computed(() => name.value.trim());
 
 const steps = computed(() =>
 {
@@ -130,7 +110,7 @@ const steps = computed(() =>
     startPointArg = startPoint.value;
   }
   return buildCreateBranchSteps({
-    name: trimmed.value,
+    name: tidied.value,
     startPoint: startPointArg,
     checkout: checkout.value,
     orphan: orphan.value,
@@ -141,7 +121,7 @@ const steps = computed(() =>
 
 async function create(): Promise<void>
 {
-  if (!trimmed.value || busy.value)
+  if (!tidied.value || busy.value)
   {
     return;
   }
@@ -153,9 +133,9 @@ async function create(): Promise<void>
     return;
   }
   // git's own rules, asked of git: normalising covers the common typo, not every case.
-  if (!(await api['repo:validBranchName'](path, trimmed.value)))
+  if (!(await api['repo:validBranchName'](path, tidied.value)))
   {
-    error.value = `'${trimmed.value}' is not a valid branch name.`;
+    error.value = `'${tidied.value}' is not a valid branch name.`;
     return;
   }
 
@@ -169,14 +149,10 @@ async function create(): Promise<void>
   <DialogFrame title="Create Branch" @close="emit('close')">
     <div class="form">
       <FormText
-        v-model="name"
+        v-model="typed"
         label="Branch name"
         placeholder="feature/my-branch"
-        :hint="
-          settings.settings.normaliseBranchNames
-            ? 'Tidied into a name git accepts when you leave the field.'
-            : undefined
-        "
+        :hint="nameHint"
         @input="nameTouched = true"
         @blur="normalise"
       />
@@ -222,7 +198,7 @@ async function create(): Promise<void>
 
     <template #actions>
       <button @click="emit('close')">Cancel</button>
-      <button class="primary" :disabled="!trimmed || busy" @click="create">
+      <button class="primary" :disabled="!tidied || busy" @click="create">
         {{ busy ? 'Creating…' : 'Create Branch' }}
       </button>
     </template>
