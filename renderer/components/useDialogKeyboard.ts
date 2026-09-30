@@ -55,6 +55,17 @@ export function useDialogKeyboard({ ui, ready, close }: DialogKeyboardDeps): voi
   }
 
   /**
+   * True once the dialog has put the keyboard somewhere itself: the commit screen puts it
+   * in the message, and the first field in document order is a list's filter. A dialog
+   * that chose is never overruled.
+   */
+  function focusAlreadyPlaced(): boolean
+  {
+    const active = document.activeElement;
+    return !!active && !!document.querySelector('.frame .body')?.contains(active);
+  }
+
+  /**
    * Focus the first field, waiting for it to exist rather than assuming it already
    * does: an async dialog (`defineAsyncComponent` in `dialogs/routes.ts`) is still a
    * comment node at `ready`. Polls rather than a fixed `nextTick`, giving up after a
@@ -65,7 +76,7 @@ export function useDialogKeyboard({ ui, ready, close }: DialogKeyboardDeps): voi
     const deadline = Date.now() + 1000;
     for (;;)
     {
-      if (!mounted)
+      if (!mounted || focusAlreadyPlaced())
       {
         return;
       }

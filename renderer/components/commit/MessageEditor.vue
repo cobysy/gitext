@@ -3,10 +3,11 @@
  * Commit message editor: Monaco in markdown (no wrapping, preserves author's line breaks).
  */
 
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 import * as monaco from '@renderer/monaco.js';
 import { applyMonacoTheme, monacoThemeName } from '@renderer/monaco.js';
 import { useSettingsStore } from '@renderer/stores/settings.js';
+import { TEXT_ENTRY_ATTRIBUTE } from '@renderer/keys.js';
 
 const props = defineProps<{
   modelValue: string;
@@ -31,9 +32,6 @@ const container = ref<HTMLElement | null>(null);
 let editor: monaco.editor.IStandaloneCodeEditor | null = null;
 let model: monaco.editor.ITextModel | null = null;
 let resizeObserver: ResizeObserver | null = null;
-
-/** Monaco has no placeholder of its own, so the empty state is drawn over the top. */
-const empty = computed(() => props.modelValue === '');
 
 watch(
   () => settings.effectiveTheme,
@@ -60,6 +58,8 @@ function createEditor(): void
 
   editor = monaco.editor.create(container.value, {
     model,
+    // Monaco's own, so it sits exactly where the first character will.
+    placeholder: props.placeholder,
     theme: monacoThemeName(settings.effectiveTheme),
     wordWrap: 'off',
     lineNumbers: 'off',
@@ -172,11 +172,8 @@ defineExpose({
 </script>
 
 <template>
-  <div class="message-editor">
+  <div class="message-editor" :[TEXT_ENTRY_ATTRIBUTE]="''">
     <div ref="container" class="monaco fill" />
-    <div v-if="empty && placeholder" class="placeholder" aria-hidden="true">
-      {{ placeholder }}
-    </div>
   </div>
 </template>
 
@@ -189,22 +186,5 @@ defineExpose({
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   overflow: hidden;
-}
-
-/*
-  Over the editor rather than inside it: Monaco has no placeholder, and the text has to
-  sit exactly where the first character will. `pointer-events: none` so a click through
-  it lands in the editor and puts the caret where it was aimed.
-*/
-.placeholder {
-  position: absolute;
-  /* Where the first character lands: the editor's top padding, and its left gutter. */
-  top: 6px;
-  left: 8px;
-  pointer-events: none;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--fg-subtle);
 }
 </style>

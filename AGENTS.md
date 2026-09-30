@@ -6,7 +6,15 @@
 
 ## Status
 
-**Nothing in flight.** A typed branch name is used tidied, not only shown tidied:
+**Nothing in flight.** The commit screen opens with the keyboard in the message:
+`useDialogKeyboard` no longer moves focus a dialog has already placed, which had put it in
+the unstaged filter. A letter typed into the message is text, not a file hotkey: Monaco
+takes keys through a plain `div`, so the editor carries `TEXT_ENTRY_ATTRIBUTE` and
+`isTextEntry` (`keys.ts`) honours it. The placeholder is Monaco's own. Commit All and
+Commit All to New Branch are built in `model/args/commit.ts` as steps (`switch -c`,
+`add -A`, `commit`), the branch name asked for in a row over the buttons.
+
+Before that, a typed branch name came to be used tidied, not only shown tidied:
 `useBranchNameField` gives Create and Rename Branch the typed text and the name the
 preview, the check and the run read, so Enter pressed inside the field no longer sends
 git the raw text. What a space becomes is a choice in Advanced (`normaliseBranchSymbol`,

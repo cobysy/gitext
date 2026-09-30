@@ -30,6 +30,28 @@ export const KEY_SPACE = ' ';
 
 /** A handler checks this before treating a bare key as a shortcut, in a text box. */
 export const TAG_TEXTAREA = 'TEXTAREA';
+const TAG_INPUT = 'INPUT';
+
+/**
+ * Marks a writable editor whose keyboard target is none of the elements a browser calls
+ * editable: Monaco takes keys through a plain `div` (its edit context), so without the
+ * mark a bare `R` typed into the commit message resets a file instead.
+ */
+export const TEXT_ENTRY_ATTRIBUTE = 'data-text-entry';
+
+/** True when a key pressed here is text being typed, which a bare-key shortcut must leave alone. */
+export function isTextEntry(target: EventTarget | null): boolean
+{
+  if (!(target instanceof HTMLElement))
+  {
+    return false;
+  }
+  if (target.tagName === TAG_INPUT || target.tagName === TAG_TEXTAREA || target.isContentEditable)
+  {
+    return true;
+  }
+  return target.closest(`[${TEXT_ENTRY_ATTRIBUTE}]`) !== null;
+}
 
 const KEY_ALIASES: Record<string, string> = {
   ArrowUp: ACCEL_UP,

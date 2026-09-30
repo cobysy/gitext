@@ -15,18 +15,14 @@ import {
   type InProgressOperation,
   type MessageFileName
 } from '@shared/types.js';
-import { HISTORY_MOVE, REFS, type RepoFacet } from '@shared/invalidation.js';
+import { REFS, type RepoFacet } from '@shared/invalidation.js';
 import type { SelectionState } from './selection.js';
+import { buildCommitSteps, type CommitOptions, type CommitScope } from '@renderer/model/args/commit.js';
 
-const CMD_COMMIT = 'commit';
+/** Where HEAD is, with what is staged: the Commit button. */
+const STAGED_ONLY: CommitScope = { all: false, newBranch: '' };
+
 const CMD_PUSH = 'push';
-const FLAG_AMEND = '--amend';
-const FLAG_RESET_AUTHOR = '--reset-author';
-const FLAG_AUTHOR = '--author';
-const FLAG_NO_VERIFY = '--no-verify';
-const FLAG_CLEANUP_STRIP = '--cleanup=strip';
-const FLAG_MESSAGE = '-m';
-const FLAG_NO_EDIT = '--no-edit';
 
 /** True for an operation that leaves git with a message of its own already prepared. */
 function preparesCommitMessage(operation: InProgressOperation): boolean
@@ -118,67 +114,73 @@ export function createCommitState({
     { immediate: true }
   );
 
-  /** Nothing staged is nothing to commit, unless amending or finishing an operation that already has its own commit prepared, either of which can stand alone. */
-  const canCommit = computed(
-    () =>
-      (selection.stagedFiles.value.length > 0 || amend.value || finishingOperation.value) &&
-      (message.value.trim() !== '' || amend.value || finishingOperation.value)
-  );
-
-  const commitArgv = computed(() =>
+  /** Whether the scope has any file to commit: what is staged, and under Commit All what is not yet. */
+  function hasFilesIn(scope: CommitScope): boolean
   {
-    if (!canCommit.value)
+    if (selection.stagedFiles.value.length > 0)
+    {
+      return true;
+    }
+    return scope.all && selection.unstagedFiles.value.length > 0;
+  }
+
+  /** Nothing to commit is nothing to commit, unless amending or finishing an operation that already has its own commit prepared, either of which can stand alone. */
+  function canCommitWith(scope: CommitScope): boolean
+  {
+    return (hasFilesIn(scope) || amend.value || finishingOperation.value) &&
+      (message.value.trim() !== '' || amend.value || finishingOperation.value);
+  }
+
+  const canCommit = computed(() => canCommitWith(STAGED_ONLY));
+  /** Commit All: anything changed at all, staged or not. */
+  const canCommitAll = computed(() => canCommitWith({ all: true, newBranch: '' }));
+
+  const options = computed<CommitOptions>(() => ({
+    message: message.value,
+    amend: amend.value,
+    resetAuthor: resetAuthor.value,
+    author: author.value,
+    noVerify: settings.settings.commitNoVerify,
+    finishingOperation: finishingOperation.value
+  }));
+
+  /** The commands a commit in this scope runs, or none while it cannot. */
+  function commitSteps(scope: CommitScope = STAGED_ONLY): ReturnType<typeof buildCommitSteps>
+  {
+    if (!canCommitWith(scope))
     {
       return [];
     }
-    const args = [CMD_COMMIT];
-    if (amend.value)
-    {
-      args.push(FLAG_AMEND);
-    }
-    if (resetAuthor.value)
-    {
-      args.push(FLAG_RESET_AUTHOR);
-    }
-    // After `--reset-author`: the two disagree and the later flag wins, so naming an author, the more specific instruction, has to settle which wins explicitly.
-    if (author.value.trim())
-    {
-      args.push(FLAG_AUTHOR, author.value.trim());
-    }
-    if (settings.settings.commitNoVerify)
-    {
-      args.push(FLAG_NO_VERIFY);
-    }
-    // `-m`'s default cleanup is `whitespace`, not `strip`: it leaves `#`-prefixed lines
-    // alone, and the box prefilled from `MERGE_MSG` is full of them (`# Conflicts:`), so
-    // left in they'd land in the commit verbatim. `--no-edit` never needs this: reading
-    // the file through git's own commit machinery already strips them.
-    if (finishingOperation.value)
-    {
-      args.push(FLAG_CLEANUP_STRIP);
-    }
-    if (message.value.trim())
-    {
-      args.push(FLAG_MESSAGE, message.value.trim());
-    }
-    else
-    {
-      args.push(FLAG_NO_EDIT);
-    }
-    return args;
-  });
+    return buildCommitSteps(options.value, scope);
+  }
 
-  async function commit(options: { push?: boolean } = {}): Promise<boolean>
+  const commitArgv = computed(() => commitSteps().at(-1)?.argv ?? []);
+
+  /** Runs each step in turn, stopping at the first git refuses: nothing after it would make sense without it. */
+  async function runSteps(steps: ReturnType<typeof buildCommitSteps>): Promise<boolean>
   {
-    if (!canCommit.value)
+    for (const step of steps)
+    {
+      if (!(await run(step.argv, step.invalidates)))
+      {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  async function commit(opts: { push?: boolean } & Partial<CommitScope> = {}): Promise<boolean>
+  {
+    const scope: CommitScope = { all: opts.all ?? false, newBranch: opts.newBranch ?? '' };
+    const steps = commitSteps(scope);
+    if (!steps.length)
     {
       return false;
     }
     committing.value = true;
     try
     {
-      const ok = await run(commitArgv.value, HISTORY_MOVE);
-      if (!ok)
+      if (!(await runSteps(steps)))
       {
         return false;
       }
@@ -192,7 +194,7 @@ export function createCommitState({
       // this returns, so the screen closes either way, but a refused push is handed on
       // rather than dropped: the whole point of the button is not having to push after yourself.
       // `console: true`: the push is over the network, watched like every other one.
-      if (options.push && !(await run([CMD_PUSH], REFS, { console: true })))
+      if (opts.push && !(await run([CMD_PUSH], REFS, { console: true })))
       {
         onPushFailed(failureOutput.value || (error.value ?? ''));
       }
@@ -218,7 +220,9 @@ export function createCommitState({
     resetAuthor,
     author,
     canCommit,
+    canCommitAll,
     commitArgv,
+    commitSteps,
     commit,
     reset
   };

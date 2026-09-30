@@ -5,10 +5,9 @@
 
 import { onMounted, onUnmounted, type Ref } from 'vue';
 import { availableCommands, runCommand, scopeAllows } from '@renderer/commands/registry.js';
-import { KEY_ESCAPE, TAG_TEXTAREA, eventToAccelerator } from '@renderer/keys.js';
+import { KEY_ESCAPE, eventToAccelerator, isTextEntry } from '@renderer/keys.js';
 import type { CommandContext } from '@renderer/commands/registry.js';
 
-const TAG_INPUT = 'INPUT';
 const ACCELERATOR_MOD_PREFIX = 'Mod';
 
 export interface CommandHotkeyOptions {
@@ -36,11 +35,7 @@ export function useCommandHotkeys(opts: CommandHotkeyOptions)
     }
 
     // Let the focused control handle its own typing.
-    const target = event.target as HTMLElement | null;
-    const typing =
-      target?.tagName === TAG_INPUT ||
-      target?.tagName === TAG_TEXTAREA ||
-      target?.isContentEditable === true;
+    const typing = isTextEntry(event.target);
 
     const accelerator = eventToAccelerator(event);
 
