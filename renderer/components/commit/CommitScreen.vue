@@ -20,7 +20,7 @@
  * isn't its to decide; `fullWindow` opens it at the repository window's size.
  */
 
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { api } from '@renderer/api.js';
 import { useRepoStore } from '@renderer/stores/repo.js';
 import { useStagingStore } from '@renderer/stores/staging.js';
@@ -37,6 +37,8 @@ import CommandPreview from '@renderer/components/transparency/CommandPreview.vue
 import DialogFrame from '@renderer/components/ui/DialogFrame.vue';
 import PaneSplitter from '@renderer/components/ui/PaneSplitter.vue';
 import MessageEditor from '@renderer/components/commit/MessageEditor.vue';
+import FormText from '@renderer/components/ui/FormText.vue';
+import { useBranchNameField } from '@renderer/composables/useBranchNameField.js';
 import { usePaneSizing } from './usePaneSizing.js';
 import { useScreenKeyboard } from './useScreenKeyboard.js';
 import { registerCommands } from '@renderer/commands/index.js';
@@ -119,7 +121,9 @@ function openConflicts(): void
  * via `useDialog`; this screen runs its own commit instead, so it does the same thing
  * explicitly: `commit()` reports whether it worked, and a failure leaves the window up with git's error on it.
  */
-async function commitAndClose(options: { push?: boolean } = {}): Promise<void>
+async function commitAndClose(
+  options: { push?: boolean; all?: boolean; newBranch?: string } = {}
+): Promise<void>
 {
   if (await staging.commit(options))
   {
@@ -127,12 +131,62 @@ async function commitAndClose(options: { push?: boolean } = {}): Promise<void>
   }
 }
 
+/**
+ * Commit All to New Branch asks for the name in a row over the buttons rather than in a
+ * window of its own: the message it commits with is in this one.
+ */
+const branchRow = ref(false);
+const branchField = ref<InstanceType<typeof FormText> | null>(null);
+const { typed: branchTyped, name: branchName, hint: branchHint, commit: normaliseBranch } =
+  useBranchNameField();
+
+function openBranchRow(): void
+{
+  branchRow.value = true;
+  void nextTick(() => branchField.value?.input?.focus());
+}
+
+function closeBranchRow(): void
+{
+  branchRow.value = false;
+  branchTyped.value = '';
+}
+
+const canCommitToNewBranch = computed(() => staging.canCommitAll && branchName.value !== '');
+
+function commitToNewBranch(): void
+{
+  if (canCommitToNewBranch.value)
+  {
+    void commitAndClose({ all: true, newBranch: branchName.value });
+  }
+}
+
+/** Every command the branch row would run, while it is open; `CommandPreview` prefers these to the one commit. */
+const previewSteps = computed(() =>
+{
+  if (branchRow.value)
+  {
+    return staging.commitSteps({ all: true, newBranch: branchName.value });
+  }
+  return undefined;
+});
+
 /** Cmd/Ctrl+Enter to commit, Escape to close, Cmd/Ctrl+1-4 to jump to a pane. */
 useScreenKeyboard({
   screen,
   messageBox,
-  menuOpen: () => menu.value !== null,
-  closeMenu: () => (menu.value = null),
+  // Escape takes back the last thing opened before it closes the screen.
+  menuOpen: () => menu.value !== null || branchRow.value,
+  closeMenu: () =>
+  {
+    if (menu.value)
+    {
+      menu.value = null;
+      return;
+    }
+    closeBranchRow();
+  },
   onClose: () => emit('close')
 });
 
@@ -269,6 +323,27 @@ onMounted(() =>
             @cancel="emit('close')"
           />
 
+          <div v-if="branchRow" class="controls">
+            <FormText
+              ref="branchField"
+              v-model="branchTyped"
+              class="branch"
+              label="New branch"
+              :hint="branchHint"
+              placeholder="feature/my-branch"
+              @blur="normaliseBranch"
+              @keydown.enter="commitToNewBranch"
+            />
+            <button @click="closeBranchRow">Cancel</button>
+            <button
+              class="primary"
+              :disabled="!canCommitToNewBranch || staging.committing"
+              @click="commitToNewBranch"
+            >
+              Create Branch and Commit All
+            </button>
+          </div>
+
           <div class="controls">
             <label class="check">
               <input v-model="staging.amend" type="checkbox" />
@@ -281,6 +356,18 @@ onMounted(() =>
             <button @click="openMenu(commitOptions, $event)">Options ▴</button>
 
             <span class="spacer" />
+            <button
+              :disabled="!staging.canCommitAll || staging.committing || branchRow"
+              @click="openBranchRow"
+            >
+              Commit All to New Branch
+            </button>
+            <button
+              :disabled="!staging.canCommitAll || staging.committing"
+              @click="commitAndClose({ all: true })"
+            >
+              Commit All
+            </button>
             <button
               :disabled="!staging.canCommit || staging.committing"
               @click="commitAndClose({ push: true })"
@@ -298,6 +385,7 @@ onMounted(() =>
 
           <CommandPreview
             :argv="staging.commitArgv"
+            :steps="previewSteps"
             placeholder="Stage something and write a message"
           />
         </div>
@@ -416,6 +504,11 @@ onMounted(() =>
   overflow: hidden;
   text-overflow: ellipsis;
   word-break: normal;
+  min-width: 0;
+}
+
+.branch {
+  flex: 1;
   min-width: 0;
 }
 

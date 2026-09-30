@@ -266,6 +266,14 @@ export function implementStagingCommands(): void
     }
   });
 
+  implementCommand('staging.commitAll', async () =>
+  {
+    if (await useStagingStore().commit({ all: true }))
+    {
+      await api['dialog:close']();
+    }
+  });
+
   // HEAD stated rather than left to the dialog's default: the commit screen's operand is
   // where you are, and a payload that says so is one a reader can check.
   implementCommand('staging.createBranch', () =>

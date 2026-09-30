@@ -114,6 +114,8 @@ export const useStagingStore = defineStore('staging', () =>
     committing: commit.committing,
     isEmpty,
     canCommit: commit.canCommit,
+    canCommitAll: commit.canCommitAll,
+    commitSteps: commit.commitSteps,
     commitArgv: commit.commitArgv,
     select: selection.select,
     selectPaths: selection.selectPaths,

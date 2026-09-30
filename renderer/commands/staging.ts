@@ -61,6 +61,7 @@ export function registerStagingCommands(): void
   declareCommand('staging.resetAuthor', 'Reset Author', GROUP_COMMIT_SCREEN, onScreen);
   declareCommand('staging.resetSoft', 'Reset Soft to Previous Commit…', GROUP_COMMIT_SCREEN, onScreen);
   declareCommand('staging.commitAndPush', 'Commit and Push', GROUP_COMMIT_SCREEN, onScreen);
+  declareCommand('staging.commitAll', 'Commit All', GROUP_COMMIT_SCREEN, onScreen);
   // No hotkey: `Mod+Shift+B` belongs to `branch.create`, and that one is a menu-bar row,
   // so its accelerator is live in this window too. Two commands answering one keystroke in
   // the same window is a coin toss; this one is a row on the Options menu instead.

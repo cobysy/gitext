@@ -53,7 +53,7 @@ test.use({
 function previewOf(screen: CommitScreen): Promise<string>
 {
   return screen.page
-    .locator('.compose .preview, .compose code')
+    .locator('.compose .preview')
     .first()
     .innerText()
     .catch(() => '');
@@ -670,4 +670,81 @@ test('close the screen', async ({ app }) =>
     app.main.locator('.grid'),
     'the repository window is not behind it'
   ).toBeVisible();
+});
+
+// After the screen has closed, so this one opens it: typing straight away has to land in
+// the message, not in the first field on the page, which is the unstaged list's filter.
+test('typing on open writes the message', async ({ app }) =>
+{
+  const screen = await openCommitScreen(app);
+
+  await expect(
+    async () =>
+    {
+      await screen.page.keyboard.type('x');
+      expect(await screen.messageText()).toContain('x');
+    },
+    'what was typed did not reach the message'
+  ).toPass({ timeout: 8000 });
+  await expect(screen.page.locator('.unstaged .filter-box input')).toHaveValue('');
+});
+
+// Typed key by key, not inserted: the file lists' bare-letter hotkeys (`H`, `T`, `R`)
+// share this window, and a key they took never reached the message.
+test('letters that are file hotkeys still type', async ({ app, repo }) =>
+{
+  const screen = await openCommitScreen(app);
+  const statusBefore = repo.status();
+
+  await screen.page.click('.compose .message .monaco-editor');
+  await screen.page.keyboard.press(mod('a'));
+  await screen.page.keyboard.type('the rest', { delay: 20 });
+
+  await expect(async () => expect(await screen.messageText()).toBe('the rest')).toPass();
+  expect(repo.status(), 'a hotkey acted on the working tree').toBe(statusBefore);
+});
+
+// Last: these two spend the working tree.
+test('commit all: tracked and untracked alike', async ({ app, repo }) =>
+{
+  repo.append('README.md', '\nOne more line.\n');
+  repo.write('commit-all-new.txt', 'untracked until now\n');
+  const screen = await openCommitScreen(app);
+  const headBefore = repo.head();
+
+  await screen.writeMessage('chore: commit everything');
+  await screen.click('Commit All');
+  await expect(
+    () => expect(repo.head()).not.toBe(headBefore),
+    'no commit was made'
+  ).toPass({ timeout: 12_000 });
+
+  expect(repo.subject()).toBe('chore: commit everything');
+  expect(repo.status(), 'something was left out of the commit').toBe('');
+  const committed = repo.git(['show', '--stat', '--format=', 'HEAD']);
+  expect(committed).toContain('README.md');
+  expect(committed).toContain('commit-all-new.txt');
+});
+
+test('commit all to a new branch', async ({ app, repo }) =>
+{
+  repo.write('on-a-branch.txt', 'belongs on the new branch\n');
+  const screen = await openCommitScreen(app);
+  const branchBefore = repo.branch();
+  const headBefore = repo.head();
+
+  await screen.writeMessage('feat: start somewhere new');
+  await screen.click('Commit All to New Branch');
+  await screen.setTextByLabel('New branch', 'tour/commit-all');
+  expect(await previewOf(screen)).toContain('git switch -c tour/commit-all');
+  await screen.click('Create Branch and Commit All');
+
+  await expect(
+    () => expect(repo.branch()).toBe('tour/commit-all'),
+    'HEAD is not on the new branch'
+  ).toPass({ timeout: 12_000 });
+  await expect(() => expect(repo.subject()).toBe('feat: start somewhere new')).toPass();
+  expect(repo.parents()).toEqual([headBefore]);
+  expect(repo.git(['rev-parse', branchBefore]), `${branchBefore} moved`).toBe(headBefore);
+  expect(repo.status()).toBe('');
 });

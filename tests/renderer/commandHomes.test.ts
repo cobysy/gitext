@@ -75,6 +75,7 @@ const elsewhere = new Map<string, string>([
   // Controls of their own on the commit screen: a button, or a keystroke over a list that
   // already answers the arrow keys. A menu row would name a gesture that is already there.
   ['staging.commitAndPush', 'the commit screen: its own button beside Commit'],
+  ['staging.commitAll', 'the commit screen: its own button beside Commit'],
   ['staging.selectNext', 'the commit screen: a keystroke over a list that scrolls'],
   ['staging.selectPrevious', 'the commit screen: a keystroke over a list that scrolls'],
   ['staging.focusUnstaged', 'the commit screen: a keystroke, and the panes are all visible'],
