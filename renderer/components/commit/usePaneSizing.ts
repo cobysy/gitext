@@ -6,6 +6,7 @@ import { nextTick, onMounted, onUnmounted, ref, watch, type Ref } from 'vue';
 import { usePaneSplitter } from '@renderer/composables/useSplitter.js';
 import { useSettingsStore } from '@renderer/stores/settings.js';
 import { useStagingStore } from '@renderer/stores/staging.js';
+import { stagedHeight } from '@renderer/model/listSplit.js';
 
 /** The smallest either file list is ever squeezed to, dragged or fitted. */
 const MIN_LIST = 80;
@@ -48,7 +49,7 @@ export function usePaneSizing(opts: PaneSizingOptions)
   });
 
   /**
-   * Divider auto-fits based on list content (split proportionally if both don't fit).
+   * Divider auto-fits to the lists' contents (`stagedHeight` says how).
    * Once dragged, stays pinned until the next auto-fit trigger.
    */
   const pinnedDivider = ref(false);
@@ -99,20 +100,12 @@ export function usePaneSizing(opts: PaneSizingOptions)
       return;
     }
 
-    const staged = wantedHeight(stagedEl.value);
-    const unstaged = wantedHeight(unstagedEl.value);
-    let wanted;
-    if (staged + unstaged <= available)
-    {
-      wanted = staged;
-    }
-    else
-    {
-      wanted = (available * staged) / (staged + unstaged);
-    }
-
-    const ceiling = Math.max(MIN_LIST, available - MIN_LIST);
-    stagedPane.size.value = Math.round(Math.min(Math.max(wanted, MIN_LIST), ceiling));
+    stagedPane.size.value = stagedHeight({
+      available,
+      staged: wantedHeight(stagedEl.value),
+      unstaged: wantedHeight(unstagedEl.value),
+      min: MIN_LIST
+    });
   }
 
   /** Re-fit after Vue has drawn whatever changed, or the rows measured are the old ones. */
