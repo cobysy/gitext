@@ -6,7 +6,15 @@
 
 ## Status
 
-**Nothing in flight.** The commit screen opens with the keyboard in the message:
+**Nothing in flight.** The grid reaches the whole history again on a clean working
+tree: `rows` handed back the `commits` array itself when there were no artificial rows,
+and since batches are appended to it in place, every computed reading it (the
+virtualizer's count, the graph's props) stopped at a read's first batch. A reload slow
+enough to arrive in several batches left the rest of the history drawn as nothing and
+out of reach of the scrollbar. `rows` is now always a new array
+(`tests/renderer/revisionRows.test.ts`).
+
+Before that, the commit screen opened with the keyboard in the message:
 `useDialogKeyboard` no longer moves focus a dialog has already placed, which had put it in
 the unstaged filter. A letter typed into the message is text, not a file hotkey: Monaco
 takes keys through a plain `div`, so the editor carries `TEXT_ENTRY_ATTRIBUTE` and
