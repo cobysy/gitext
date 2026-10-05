@@ -47,22 +47,14 @@ export const useRevisionsStore = defineStore('revisions', () =>
    * What the grid actually draws: the artificial rows, then the commits.
    *
    * One list, so row *n* of the grid, of `graph`, and of a shift-range all mean the
-   * same thing. When there are no artificial rows this is `commits` itself rather
-   * than a copy of it: the common case on a clean tree, and worth not copying
-   * tens of thousands of entries for.
+   * same thing.
+   *
+   * Always a new array, never `commits` itself: a computed tells its readers only when
+   * it returns a different value, and `commits` is appended to in place, so handing it
+   * back would report the first batch of a read and nothing after it. The grid would
+   * size itself to that batch and leave the rest of the history out of reach.
    */
-  const rows = computed<CommitRow[]>(() =>
-  {
-    if (artificialRows.value.length === 0)
-    {
-      return stream.commits.value;
-    }
-    else
-    {
-      return [...artificialRows.value, ...stream.commits.value];
-    }
-  }
-  );
+  const rows = computed<CommitRow[]>(() => [...artificialRows.value, ...stream.commits.value]);
 
   const layout = createLayoutState({
     repo,
