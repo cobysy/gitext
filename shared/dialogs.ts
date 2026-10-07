@@ -100,7 +100,8 @@ export type DialogName =
 export interface DialogOpenOptions {
   /**
    * Nobody asked: the app raised this itself (the resolver, for conflicts that appear
-   * mid-run). Dropped when another dialog is already open, rather than closing it.
+   * mid-run). Dropped when another dialog is already open, rather than closing it, and
+   * while another application is in front.
    */
   automatic?: boolean;
 }

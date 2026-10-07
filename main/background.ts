@@ -9,7 +9,7 @@
  * failure there is. Not a setting: a real run could get stuck with a setting.
  */
 
-import { app, type BrowserWindow, type WebPreferences } from 'electron';
+import { app, BrowserWindow, type WebPreferences } from 'electron';
 
 /** Launched to be driven, not used. */
 export const backgroundLaunch = process.env.GITEXT_BACKGROUND === '1';
@@ -55,4 +55,14 @@ export function raiseWindow(win: BrowserWindow): void
     return;
   }
   win.focus();
+}
+
+/**
+ * Whether this app is the one in front: some window of ours holds focus. A driven run
+ * counts as in front, since it stands in for somebody looking at the app and its windows,
+ * never shown, cannot hold focus.
+ */
+export function appInFront(): boolean
+{
+  return backgroundLaunch || BrowserWindow.getFocusedWindow() !== null;
 }
