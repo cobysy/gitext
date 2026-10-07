@@ -3,7 +3,9 @@
  * and the console window a watched run streams into.
  */
 
-import { clipboard } from 'electron';
+import { clipboard, type BrowserWindow } from 'electron';
+import { appInFront } from '@main/background.js';
+import type { DialogOpenOptions } from '@shared/dialogs.js';
 import {
   closeDialogWindow,
   fitDialogWindow,
@@ -17,6 +19,22 @@ import {
   handleFromWindow
 } from '../register.js';
 
+/**
+ * Whether a window nobody asked for is dropped. It waits its turn behind an open modal:
+ * `openDialogWindow` reads a request from the repository window as "start fresh", which
+ * is wrong for a raise the app decided on itself. And it never takes the screen from
+ * another application: whoever is working there, resolving those very conflicts in a
+ * terminal or an editor, is not asking for this one. The banner still says so.
+ */
+function standsDown(owner: BrowserWindow, options: DialogOpenOptions | undefined): boolean
+{
+  if (!options?.automatic)
+  {
+    return false;
+  }
+  return modalChildOf(owner) !== null || !appInFront();
+}
+
 export function registerDialogHandlers(): void
 {
   // ── Dialog windows ──────────────────────────────────────────────────────────
@@ -28,9 +46,7 @@ export function registerDialogHandlers(): void
     {
       return;
     }
-    // A window nobody asked for waits its turn: `openDialogWindow` reads a request
-    // from the repository window as "start fresh", which is wrong for a raise the app decided on itself.
-    if (options?.automatic && modalChildOf(owner))
+    if (standsDown(owner, options))
     {
       return;
     }

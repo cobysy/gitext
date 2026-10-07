@@ -6,7 +6,12 @@
 
 ## Status
 
-**Nothing in flight.** The session log is meant to reproduce a fault without the
+**Nothing in flight.** Conflicts that appear while another application is in front no
+longer raise the resolver: whoever made them is resolving them there, and the banner
+reports them on return (`standsDown` in `main/ipc/handlers/dialogs.ts`). A driven run
+counts as in front, so the suite still sees the raise.
+
+Before that, the session log is meant to reproduce a fault without the
 repository, which never leaves the machine it is on. On each error (thrown or shown,
 once per second) `main/diagnostics/errorCapture.ts` prints the log's path, records the
 repository's state (operation, conflicts, a `status` read) and dumps the newest output of

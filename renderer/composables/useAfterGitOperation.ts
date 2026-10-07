@@ -94,11 +94,9 @@ export function useAfterGitOperation()
    * arriving mid-merge reads as arriving, not improving.
    *
    * `automatic`, since nobody asked: dropped rather than taking the screen from an open
-   * dialog, palette, or confirmation.
-   *
-   * It *does* take the screen from another application, deliberately: a conflict with
-   * no command of ours behind it happened elsewhere, so the app is by definition not
-   * frontmost, and standing down whenever inactive would defeat the one case this exists for.
+   * dialog, palette, or confirmation, and dropped while another application is in front.
+   * Conflicts that appear while somebody works elsewhere are being resolved there; the
+   * banner is what reports them when they come back.
    *
    * For the repository window alone: every dialog window holds a copy of this store and
    * would raise the same window on the same broadcast.
