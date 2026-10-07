@@ -6,6 +6,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { api } from '@renderer/api.js';
+import { noteShownError } from '@renderer/diagnostics.js';
 import type { PaneId } from '@renderer/commands/registry.js';
 import type { CommitPane } from '@renderer/stores/staging/types.js';
 import type { DialogName, DialogOpenOptions, DialogPayload } from '@shared/dialogs.js';
@@ -158,6 +159,10 @@ export const useUiStore = defineStore('ui', () =>
   {
     const item: Toast = { id: nextToastId++, message, tone };
     toasts.value.push(item);
+    if (tone === TOAST_TONE_ERROR)
+    {
+      noteShownError(message);
+    }
     setTimeout(() =>
     {
       toasts.value = toasts.value.filter((t) => t.id !== item.id);

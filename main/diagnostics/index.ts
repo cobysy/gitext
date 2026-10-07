@@ -10,9 +10,9 @@
  * Git runs arrive by subscribing to `runnerEvents` rather than by the runner calling in:
  * the runner's job is spawning, and nothing in it should have to know this exists.
  *
- * In memory, not appended to disk. A rolling file would put I/O on the path of every git
- * command to buy nothing most sessions; what a crash actually needs is `writeCrashReport`
- * below, which flushes the ring at the one moment the ring is about to be lost.
+ * The ring is what "Save Diagnostics…" and the crash and error reports below write out.
+ * Every entry also goes to this run's session log (`sessionLog.ts`) as it is recorded,
+ * because an error the app handled raises no report, and the ring dies with the session.
  */
 
 import { app } from 'electron';
@@ -25,14 +25,23 @@ import {
   DIAGNOSTIC_GIT,
   DIAGNOSTIC_NOTE,
   DIAGNOSTIC_SESSION,
+  DIAGNOSTIC_SHOWN,
   DIAGNOSTICS_RING_DEPTH,
   type DiagnosticEntry,
   type DiagnosticKind
 } from '@shared/types/diagnostics.js';
 import type { GitCommandRecord, Settings } from '@shared/types.js';
 import { runnerEvents } from '@main/git/runner.js';
-import { renderReport, renderReportLines } from './report.js';
+import {
+  renderEntry,
+  renderHeader,
+  renderReport,
+  renderReportLines,
+  type ReportOptions
+} from './report.js';
+import { appendToSessionLog, openSessionLog, sessionLogPath } from './sessionLog.js';
 import { fileResolver, resolveStack } from './sourcemap.js';
+import { writeToSystemLog } from './systemLog.js';
 
 /**
  * Settings that say where a window was, not how the app behaves.
@@ -52,6 +61,9 @@ const NOT_BEHAVIOUR = new Set<keyof Settings>([
   'commitStagedHeight'
 ]);
 
+/** The kinds of entry that are an error, thrown or shown, and so print where the log is. */
+const POINTS_TO_LOG = new Set<DiagnosticKind>([DIAGNOSTIC_ERROR, DIAGNOSTIC_SHOWN]);
+
 /** How much of a failing command's output the timeline keeps. Enough to read the error. */
 const MAX_OUTPUT_LINES = 12;
 
@@ -59,6 +71,37 @@ const ring: DiagnosticEntry[] = [];
 
 /** The repository the last `noteRepository` named, so a report can be repo-relative. */
 let currentRepoRoot: string | null = null;
+
+/** Where each entry goes as it is recorded, once `startSessionLog` has opened one. */
+let sessionSink: ((entry: DiagnosticEntry) => void) | null = null;
+
+function reportOptions(redact: boolean): ReportOptions
+{
+  return {
+    redact,
+    redaction: { home: homedir(), repoRoot: currentRepoRoot },
+    generatedAt: Date.now()
+  };
+}
+
+/**
+ * Open this run's session log in the logs directory, and answer where it is.
+ *
+ * `redact` is asked per entry rather than once, so turning the setting on mid-session
+ * scrubs everything written after it.
+ */
+export function startSessionLog(redact: () => boolean): string | null
+{
+  const path = openSessionLog(logsDirectory(), () => renderHeader(reportOptions(redact())));
+  sessionSink = (entry) => appendToSessionLog(renderEntry(entry, reportOptions(redact())));
+  return path;
+}
+
+/** The folder the session logs and the crash and error reports are written to. */
+export function logsDirectory(): string
+{
+  return app.getPath('logs');
+}
 
 export function record(
   kind: DiagnosticKind,
@@ -82,7 +125,40 @@ export function record(
   {
     ring.splice(0, ring.length - DIAGNOSTICS_RING_DEPTH);
   }
+  sessionSink?.(entry);
+  if (POINTS_TO_LOG.has(kind))
+  {
+    pointToSessionLog();
+  }
 }
+
+/**
+ * Say on the main process's console, and in the system log Console shows, where this
+ * run's log is, beside the error that makes it worth reading: nobody should have to
+ * remember the logs directory to find it. Here, where every window's errors arrive, so
+ * one place covers them all.
+ *
+ * Once per burst: an uncaught error arrives as thrown and again as shown, and a failure
+ * that repeats would otherwise bury its own messages under pointers to the same file.
+ */
+function pointToSessionLog(): void
+{
+  const path = sessionLogPath();
+  const now = Date.now();
+  if (!path || now - lastPointedAt < POINTER_QUIET_MS)
+  {
+    return;
+  }
+  lastPointedAt = now;
+  const pointer = `Diagnostics log: ${path}`;
+  console.error(pointer);
+  writeToSystemLog(pointer);
+}
+
+/** How long after one pointer to the log another error goes without its own. */
+const POINTER_QUIET_MS = 1000;
+
+let lastPointedAt = 0;
 
 export function getDiagnostics(): DiagnosticEntry[]
 {
@@ -268,11 +344,7 @@ export function noteSettingsChange(patch: Partial<Settings>): void
  */
 export function buildReport(redact: boolean, jsonl = false): string
 {
-  const options = {
-    redact,
-    redaction: { home: homedir(), repoRoot: currentRepoRoot },
-    generatedAt: Date.now()
-  };
+  const options = reportOptions(redact);
   if (jsonl)
   {
     return renderReportLines(getDiagnostics(), options);
@@ -291,7 +363,7 @@ function writeReport(redact: boolean, name: string): string | null
 {
   try
   {
-    const file = join(app.getPath('logs'), name);
+    const file = join(logsDirectory(), name);
     mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, buildReport(redact), 'utf8');
     return file;

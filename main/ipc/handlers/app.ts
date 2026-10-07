@@ -3,7 +3,7 @@
  * binary and the health check that reads it, and the command log every window shows.
  */
 
-import { app, dialog, nativeTheme } from 'electron';
+import { app, dialog, nativeTheme, shell } from 'electron';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { toDisplayLocale } from '@shared/locale.js';
@@ -16,6 +16,7 @@ import {
 } from '@main/git/runner.js';
 import {
   buildReport,
+  logsDirectory,
   noteSettingsChange,
   record,
   writeErrorReport
@@ -100,6 +101,8 @@ export function registerAppHandlers(): void
   // No dialog and no question: the window that calls this has already lost an error, and
   // the point is that the timeline is on disk before anyone thinks to ask for it.
   handle('diagnostics:autoSave', () => writeErrorReport(getSettings().redactDiagnostics));
+
+  handle('diagnostics:openLogs', () => shell.openPath(logsDirectory()));
 
   handle('diagnostics:save', async () =>
   {
