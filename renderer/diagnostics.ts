@@ -11,6 +11,7 @@
 import {
   DIAGNOSTIC_COMMAND,
   DIAGNOSTIC_ERROR,
+  DIAGNOSTIC_SHOWN,
   DIAGNOSTIC_TIMING,
   type DiagnosticKind
 } from '@shared/types/diagnostics.js';
@@ -85,6 +86,15 @@ function linesOf(stack: string | undefined): string[] | undefined
     return undefined;
   }
   return stack.split('\n').map((line) => line.trim());
+}
+
+/**
+ * An error the app caught and put in front of the user: a toast, a dialog's error line.
+ * Nothing threw, so nothing else records it, and it is the one line the user remembers.
+ */
+export function noteShownError(message: string): void
+{
+  send(DIAGNOSTIC_SHOWN, `${message}  (${windowName()})`);
 }
 
 /** A command the user ran, by id. Handed to `runCommand`, the one funnel they all pass. */

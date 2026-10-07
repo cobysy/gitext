@@ -175,6 +175,20 @@ export function registerCommands(): void
   });
 
   defineCommand({
+    id: 'help.openLogs',
+    label: 'Open Logs Folder',
+    group: 'Help',
+    run: async () =>
+    {
+      const failure = await api['diagnostics:openLogs']();
+      if (failure)
+      {
+        useUiStore().toast(failure, 'error');
+      }
+    }
+  });
+
+  defineCommand({
     id: 'help.about',
     label: 'About gitext',
     group: 'Help',

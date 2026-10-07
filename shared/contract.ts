@@ -464,6 +464,11 @@ export interface Invocations {
    * path, or null when it could not be written.
    */
   'diagnostics:autoSave': () => string | null;
+  /**
+   * Open the logs directory in Finder: the session logs and the crash and error reports.
+   * Returns an empty string, or why it could not be opened.
+   */
+  'diagnostics:openLogs': () => string;
 
   // ── Write operations ─────────────────────────────────────────────────────
   /**
@@ -693,6 +698,7 @@ export const INVOKE_CHANNELS = [
   'diagnostics:record',
   'diagnostics:save',
   'diagnostics:autoSave',
+  'diagnostics:openLogs',
   'git:run',
   'stream:start',
   'stream:cancel',

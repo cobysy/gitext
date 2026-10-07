@@ -6,7 +6,15 @@
 
 ## Status
 
-**Nothing in flight.** The grid reaches the whole history again on a clean working
+**Nothing in flight.** Every run writes its diagnostics timeline to a session log as it
+happens (`main/diagnostics/sessionLog.ts`), `~/Library/Logs/gitext/gitext-session-*.log`,
+newest 20 kept, a fresh file past 10 MB. An error the app handled raised no report and
+died with the ring; an error toast or a dialog's error line is now a `shown` entry
+(`noteShownError`, tagged `msg`). Every error, thrown or shown, prints the log's path on
+the main process's console and, through `logger`, in the system log Console shows
+(`systemLog.ts`, search `gitext:`). Help › Open Logs Folder opens the directory.
+
+Before that, the grid reaches the whole history again on a clean working
 tree: `rows` handed back the `commits` array itself when there were no artificial rows,
 and since batches are appended to it in place, every computed reading it (the
 virtualizer's count, the graph's props) stopped at a read's first batch. A reload slow

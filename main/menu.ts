@@ -389,6 +389,9 @@ function buildMenu(): Menu
         // Beside About rather than under Tools: the person reaching for it is answering
         // "how do I tell you what happened", which is what this menu is for.
         cmd('Save Diagnostics…', 'help.saveDiagnostics'),
+        // Where every run's session log is, for the error that was gone before anyone
+        // thought to save anything.
+        cmd('Open Logs Folder', 'help.openLogs'),
         cmd('About gitext', 'help.about')
       ]
     }

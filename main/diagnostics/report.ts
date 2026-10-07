@@ -11,6 +11,7 @@ import {
   DIAGNOSTIC_GIT,
   DIAGNOSTIC_NOTE,
   DIAGNOSTIC_SESSION,
+  DIAGNOSTIC_SHOWN,
   DIAGNOSTIC_TIMING,
   SLOW_MS,
   type DiagnosticEntry
@@ -23,6 +24,7 @@ const TAGS: Record<string, string> = {
   [DIAGNOSTIC_COMMAND]: 'cmd',
   [DIAGNOSTIC_GIT]: 'git',
   [DIAGNOSTIC_ERROR]: 'ERR',
+  [DIAGNOSTIC_SHOWN]: 'msg',
   [DIAGNOSTIC_NOTE]: '   ',
   [DIAGNOSTIC_TIMING]: 'ms '
 };
@@ -119,6 +121,42 @@ export function renderReportLines(
 }
 
 /**
+ * The lines above the entries: what this is, when, and whether it is safe to pass on.
+ * Shared with the session log, which writes it once when it opens.
+ */
+export function renderHeader(options: ReportOptions): string[]
+{
+  const lines = ['gitext diagnostics', `generated ${new Date(options.generatedAt).toISOString()}`];
+  if (options.redact)
+  {
+    lines.push('redacted: home path, remote credentials and commit message bodies removed');
+  }
+  else
+  {
+    lines.push('NOT redacted: contains paths, branch names, commit messages and git output');
+  }
+  return lines;
+}
+
+/** One entry as the report lays it out: its line, then its detail indented beneath. */
+export function renderEntry(entry: DiagnosticEntry, options: ReportOptions): string[]
+{
+  const tag = TAGS[entry.kind] ?? '   ';
+  const lines = [`${clockOf(entry.at)}  ${tag}  ${scrub(entry.text, options)}${outcomeOf(entry)}`];
+  for (const detail of entry.detail ?? [])
+  {
+    // A blank detail line is a paragraph break in git's own output; keep it as one.
+    if (detail.length === 0)
+    {
+      lines.push('');
+      continue;
+    }
+    lines.push(`${DETAIL_INDENT}${scrub(detail, options)}`);
+  }
+  return lines;
+}
+
+/**
  * The whole report. Entries are written in the order they were recorded, because the
  * order *is* the finding: which command ran before the error is the whole question.
  */
@@ -127,37 +165,13 @@ export function renderReport(
   options: ReportOptions
 ): string
 {
-  const lines: string[] = [];
-
-  lines.push('gitext diagnostics');
-  lines.push(`generated ${new Date(options.generatedAt).toISOString()}`);
-  if (options.redact)
-  {
-    lines.push('redacted: home path, remote credentials and commit message bodies removed');
-  }
-  else
-  {
-    lines.push(
-      'NOT redacted: contains paths, branch names, commit messages and git output'
-    );
-  }
+  const lines = renderHeader(options);
   lines.push(`${entries.length} entries`);
   lines.push('');
 
   for (const entry of entries)
   {
-    const tag = TAGS[entry.kind] ?? '   ';
-    lines.push(`${clockOf(entry.at)}  ${tag}  ${scrub(entry.text, options)}${outcomeOf(entry)}`);
-    for (const detail of entry.detail ?? [])
-    {
-      // A blank detail line is a paragraph break in git's own output; keep it as one.
-      if (detail.length === 0)
-      {
-        lines.push('');
-        continue;
-      }
-      lines.push(`${DETAIL_INDENT}${scrub(detail, options)}`);
-    }
+    lines.push(...renderEntry(entry, options));
   }
 
   // A trailing newline: the file is read with `cat` as often as in an editor.

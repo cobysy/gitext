@@ -31,6 +31,7 @@
 import { ref, type Ref } from 'vue';
 import type { RepoFacet } from '@shared/invalidation.js';
 import { api, toMessage } from '@renderer/api.js';
+import { noteShownError } from '@renderer/diagnostics.js';
 import { ConsoleFailure, runConsoleSteps } from '@renderer/gitConsole.js';
 import { useRepoStore } from '@renderer/stores/repo.js';
 import { useUiStore } from '@renderer/stores/ui.js';
@@ -229,6 +230,7 @@ export function useDialog(): DialogController
         if (!options.allowConflicts || !(await leftConflicts(repoPath)))
         {
           error.value = describe(err);
+          noteShownError(error.value);
           // What git said, whether or not the label is showing it: a `ConsoleFailure`
           // keeps it off the label and here instead.
           if (err instanceof ConsoleFailure)

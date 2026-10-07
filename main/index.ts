@@ -10,6 +10,7 @@ import {
   noteError,
   noteSession,
   noteSettings,
+  startSessionLog,
   watchGitCommands,
   writeCrashReport
 } from './diagnostics/index.js';
@@ -102,6 +103,7 @@ void app.whenReady().then(async () =>
 
   // Before anything else runs a command: the timeline is only worth reading if it
   // starts at the beginning.
+  startSessionLog(() => getSettings().redactDiagnostics);
   watchGitCommands();
   installCrashCapture();
 
