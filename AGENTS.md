@@ -6,13 +6,22 @@
 
 ## Status
 
-**Nothing in flight.** Every run writes its diagnostics timeline to a session log as it
-happens (`main/diagnostics/sessionLog.ts`), `~/Library/Logs/gitext/gitext-session-*.log`,
-newest 20 kept, a fresh file past 10 MB. An error the app handled raised no report and
-died with the ring; an error toast or a dialog's error line is now a `shown` entry
-(`noteShownError`, tagged `msg`). Every error, thrown or shown, prints the log's path on
-the main process's console and, through `logger`, in the system log Console shows
-(`systemLog.ts`, search `gitext:`). Help › Open Logs Folder opens the directory.
+**Nothing in flight.** The session log is meant to reproduce a fault without the
+repository, which never leaves the machine it is on. On each error (thrown or shown,
+once per second) `main/diagnostics/errorCapture.ts` prints the log's path, records the
+repository's state (operation, conflicts, a `status` read) and dumps the newest output of
+each recent git command as `out` entries (`flightRecorder.ts`), file contents taken out by
+`blankContent.ts`: headers, hunk ranges and names kept, each run of code lines counted.
+Between errors the timeline gains a command's options and the selection it ran on, a
+dialog's payload, every selection change once it settles (`useSelectionTrail`), each
+patch piped to git (`GitCommandRecord.stdin`, blanked), and what moved under `.git` when
+the repository changed outside the app.
+
+Before that, every run came to write its diagnostics timeline to a session log
+(`main/diagnostics/sessionLog.ts`), `~/Library/Logs/gitext/gitext-session-*.log`, newest
+20 kept, a fresh file past 10 MB, with an error toast or a dialog's error line as a
+`shown` entry. The path goes to the main process's console and, through `logger`, to the
+system log Console shows (search `gitext:`). Help › Open Logs Folder opens the directory.
 
 Before that, the grid reaches the whole history again on a clean working
 tree: `rows` handed back the `commits` array itself when there were no artificial rows,

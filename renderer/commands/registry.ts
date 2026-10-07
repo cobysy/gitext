@@ -248,9 +248,9 @@ export function availableCommands(ctx: CommandContext): CommandDef[]
  * `runCommand`, so this is the one place that can say what the user actually asked for:
  * a diagnostics report built from git alone only ever shows the consequences.
  */
-let observer: ((id: string) => void) | null = null;
+let observer: ((id: string, options: unknown) => void) | null = null;
 
-export function observeCommands(fn: (id: string) => void): void
+export function observeCommands(fn: (id: string, options: unknown) => void): void
 {
   observer = fn;
 }
@@ -270,7 +270,7 @@ export async function runCommand(
   {
     return false;
   }
-  observer?.(id);
+  observer?.(id, options);
   await command.run(options);
   return true;
 }

@@ -11,10 +11,12 @@
 import {
   DIAGNOSTIC_COMMAND,
   DIAGNOSTIC_ERROR,
+  DIAGNOSTIC_NOTE,
   DIAGNOSTIC_SHOWN,
   DIAGNOSTIC_TIMING,
   type DiagnosticKind
 } from '@shared/types/diagnostics.js';
+import { watch } from 'vue';
 import { api } from '@renderer/api.js';
 import { observeCommands } from '@renderer/commands/registry.js';
 
@@ -97,10 +99,81 @@ export function noteShownError(message: string): void
   send(DIAGNOSTIC_SHOWN, `${message}  (${windowName()})`);
 }
 
-/** A command the user ran, by id. Handed to `runCommand`, the one funnel they all pass. */
-function noteCommandRun(id: string): void
+/** Past this, a value written into the timeline is cut: a line, not a dump. */
+const MAX_VALUE_CHARS = 600;
+
+/** `value` as one line of JSON, cut to length, or why it could not be written. */
+function asLine(value: unknown): string
 {
-  send(DIAGNOSTIC_COMMAND, `${id}  (${windowName()})`);
+  let text: string;
+  try
+  {
+    text = JSON.stringify(value) ?? String(value);
+  }
+  catch
+  {
+    text = '(not serialisable)';
+  }
+  if (text.length <= MAX_VALUE_CHARS)
+  {
+    return text;
+  }
+  return `${text.slice(0, MAX_VALUE_CHARS)}... (${text.length} chars)`;
+}
+
+/**
+ * What this window has selected, as lines: set by the window that knows its stores
+ * (`useSelectionTrail`). Empty in a window that never said.
+ */
+let describeSelection: () => string[] = () => [];
+
+/**
+ * A command the user ran, by id, with what it was handed and what was selected.
+ * Handed to `runCommand`, the one funnel they all pass. The id says which operation; most
+ * commands take their operand from the selection, so without it a reader knows a branch
+ * was checked out and not which.
+ */
+function noteCommandRun(id: string, options: unknown): void
+{
+  const detail: string[] = [];
+  if (options !== undefined)
+  {
+    detail.push(`options ${asLine(options)}`);
+  }
+  detail.push(...describeSelection());
+  send(DIAGNOSTIC_COMMAND, `${id}  (${windowName()})`, detail);
+}
+
+/** How long a selection has to hold before it is recorded: a drag is one entry, not forty. */
+const SELECTION_SETTLE_MS = 400;
+
+/**
+ * Record what this window has selected each time it settles, from `describe`.
+ *
+ * Most of what goes wrong here goes wrong in what is on screen rather than in git, and the
+ * steps that lead there are clicks: a commit picked, a file, a branch in the panel. None of
+ * those is a command, so without this a log jumps from one command to the next with no
+ * way to know what the user was looking at in between.
+ */
+export function traceSelection(describe: () => string[]): void
+{
+  describeSelection = describe;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  watch(
+    () => describe().join('\n'),
+    () =>
+    {
+      if (timer)
+      {
+        clearTimeout(timer);
+      }
+      timer = setTimeout(() =>
+      {
+        timer = null;
+        send(DIAGNOSTIC_NOTE, `selection  (${windowName()})`, describe());
+      }, SELECTION_SETTLE_MS);
+    }
+  );
 }
 
 /**

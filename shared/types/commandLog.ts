@@ -30,6 +30,11 @@ export interface GitCommandRecord {
   /** What the command printed, up to `MAX_RECORD_OUTPUT` characters. Capped because a record is kept (the ring holds hundreds) and broadcast to every open window. */
   stdout: string;
   stderr: string;
+  /**
+   * What was piped to git on stdin, up to `MAX_RECORD_OUTPUT` characters: a staged patch,
+   * a commit message. As much a part of what ran as the argv is.
+   */
+  stdin?: string;
   /** Characters `stdout` would have held uncapped, set only when it was cut short. */
   stdoutBytes?: number;
   /** The same for `stderr`. */

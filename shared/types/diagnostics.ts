@@ -12,6 +12,7 @@ export const DIAGNOSTIC_COMMAND = 'command';
 export const DIAGNOSTIC_GIT = 'git';
 export const DIAGNOSTIC_ERROR = 'error';
 export const DIAGNOSTIC_SHOWN = 'shown';
+export const DIAGNOSTIC_OUTPUT = 'output';
 export const DIAGNOSTIC_NOTE = 'note';
 export const DIAGNOSTIC_TIMING = 'timing';
 
@@ -29,6 +30,11 @@ export type DiagnosticKind =
    * Nothing threw, so nothing else records it, and it is the one line the user remembers.
    */
   | typeof DIAGNOSTIC_SHOWN
+  /**
+   * What one git command printed, written out after an error with file contents taken
+   * out: the repository as the app saw it, for a reader who does not have it.
+   */
+  | typeof DIAGNOSTIC_OUTPUT
   /** A fact worth having in the timeline: a repository opened, and its shape. */
   | typeof DIAGNOSTIC_NOTE
   /**

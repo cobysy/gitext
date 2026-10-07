@@ -58,7 +58,12 @@ interface Entry {
   watcher: FSWatcher;
   timer: NodeJS.Timeout | null;
   refCount: number;
+  /** What moved since the last tick, as `<event> <path>`: see `watcherEvents`. */
+  moved: Set<string>;
 }
+
+/** How many moved paths a tick reports by name: enough to say what happened, not a listing. */
+const MAX_MOVED = 20;
 
 const entries = new Map<string, Entry>();
 
@@ -66,8 +71,12 @@ const CHANGED_EVENT = 'changed';
 const WATCHER_EVENT_ALL = 'all';
 const WATCHER_EVENT_ERROR = 'error';
 
-/** Emits `'changed'` with the repo path, debounced. */
-export const watcherEvents = new EventEmitter<{ changed: [string] }>();
+/**
+ * Emits `'changed'` with the repo path, debounced, and what moved under `.git`: `change
+ * refs/heads/main`, `add MERGE_HEAD`. The second is for the diagnostics log, which
+ * otherwise records a repository moving underneath the app as nothing at all.
+ */
+export const watcherEvents = new EventEmitter<{ changed: [string, string[]] }>();
 
 /**
  * Start watching `repoPath`, or join an existing watch of it. `gitDirs` is every
@@ -102,11 +111,15 @@ export function watchRepo(repoPath: string, gitDirs?: readonly string[]): void
     depth: 3
   });
 
-  const entry: Entry = { watcher, timer: null, refCount: 1 };
+  const entry: Entry = { watcher, timer: null, refCount: 1, moved: new Set() };
   entries.set(repoPath, entry);
 
-  const fire = (): void =>
+  const fire = (event: string, path: string): void =>
   {
+    if (entry.moved.size < MAX_MOVED)
+    {
+      entry.moved.add(`${event} ${relative(repoPath, path)}`);
+    }
     if (entry.timer)
     {
       clearTimeout(entry.timer);
@@ -114,7 +127,9 @@ export function watchRepo(repoPath: string, gitDirs?: readonly string[]): void
     entry.timer = setTimeout(() =>
     {
       entry.timer = null;
-      watcherEvents.emit(CHANGED_EVENT, repoPath);
+      const moved = [...entry.moved];
+      entry.moved.clear();
+      watcherEvents.emit(CHANGED_EVENT, repoPath, moved);
     }, DEBOUNCE_MS);
   };
 

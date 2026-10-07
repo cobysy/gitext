@@ -16,6 +16,7 @@ import { useMenuState } from '@renderer/composables/useMenuState.js';
 import { isArtificialSha } from '@shared/artificial.js';
 import { invalidateRepository } from '@renderer/composables/useRepositoryRefresh.js';
 import { useRevealCommit } from '@renderer/composables/useRevealCommit.js';
+import { useMainWindowSelectionTrail } from '@renderer/composables/useSelectionTrail.js';
 import { usePaneSplitter } from '@renderer/composables/useSplitter.js';
 import { useCommandLogStore } from '@renderer/stores/commandLog.js';
 import { useDiffStore } from '@renderer/stores/diff.js';
@@ -67,6 +68,8 @@ const log = useCommandLogStore();
 const navigation = useNavigationStore();
 const selection = useSelectionStore();
 const ui = useUiStore();
+// What is selected, into the diagnostics log as it settles: the clicks between commands.
+useMainWindowSelectionTrail();
 const { context } = useCommands();
 // The other direction of the menu wire: `useCommands` receives the ids it dispatches,
 // this reports which of them can be clicked and which way each toggle is set.

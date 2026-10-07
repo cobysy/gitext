@@ -7,6 +7,8 @@
 
 import type { GitCommandRecord } from '@shared/types.js';
 import { ALL_FACETS } from '@shared/invalidation.js';
+import { DIAGNOSTIC_NOTE } from '@shared/types/diagnostics.js';
+import { record } from '@main/diagnostics/index.js';
 import { runnerEvents } from '@main/git/runner.js';
 import { watcherEvents } from '@main/watcher.js';
 import { announce, isEcho } from './repoChanges.js';
@@ -33,7 +35,7 @@ export function registerIpcHandlers(): void
     broadcast('event:gitCommand', record);
   });
 
-  watcherEvents.on('changed', (repoPath: string) =>
+  watcherEvents.on('changed', (repoPath: string, moved: string[]) =>
   {
     // A change made outside the app: a commit in a terminal, a branch deleted by a
     // script. Our own writes come back here too, after the channel that made them
@@ -42,6 +44,7 @@ export function registerIpcHandlers(): void
     {
       return;
     }
+    record(DIAGNOSTIC_NOTE, `repository changed outside the app: ${repoPath}`, { detail: moved });
     announce(repoPath, ALL_FACETS, (change) => broadcast('event:repoChanged', change));
   });
 }
