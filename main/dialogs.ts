@@ -166,7 +166,7 @@ export function openDialogWindow(
     {
       loadDialog(existing, name, payload, currentTheme());
     }
-    noteDialog('raised', name);
+    noteDialog('raised', name, payload);
     raiseWindow(existing);
     return existing;
   }
@@ -299,7 +299,7 @@ export function openDialogWindow(
     }
   });
 
-  noteDialog('opened', name);
+  noteDialog('opened', name, payload);
   open.set(key, win);
   loadDialog(win, name, payload, theme);
   return win;

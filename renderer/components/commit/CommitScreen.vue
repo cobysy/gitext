@@ -39,6 +39,7 @@ import PaneSplitter from '@renderer/components/ui/PaneSplitter.vue';
 import MessageEditor from '@renderer/components/commit/MessageEditor.vue';
 import FormText from '@renderer/components/ui/FormText.vue';
 import { useBranchNameField } from '@renderer/composables/useBranchNameField.js';
+import { useCommitScreenSelectionTrail } from '@renderer/composables/useSelectionTrail.js';
 import { usePaneSizing } from './usePaneSizing.js';
 import { useScreenKeyboard } from './useScreenKeyboard.js';
 import { registerCommands } from '@renderer/commands/index.js';
@@ -55,6 +56,7 @@ registerCommands();
 const repo = useRepoStore();
 const staging = useStagingStore();
 const ui = useUiStore();
+useCommitScreenSelectionTrail();
 
 const messageBox = ref<InstanceType<typeof MessageEditor> | null>(null);
 const screen = ref<HTMLElement | null>(null);

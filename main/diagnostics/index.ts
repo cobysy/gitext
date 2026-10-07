@@ -39,9 +39,9 @@ import {
   renderReportLines,
   type ReportOptions
 } from './report.js';
-import { appendToSessionLog, openSessionLog, sessionLogPath } from './sessionLog.js';
+import { stdinLines } from './flightRecorder.js';
+import { appendToSessionLog, openSessionLog } from './sessionLog.js';
 import { fileResolver, resolveStack } from './sourcemap.js';
-import { writeToSystemLog } from './systemLog.js';
 
 /**
  * Settings that say where a window was, not how the app behaves.
@@ -61,8 +61,8 @@ const NOT_BEHAVIOUR = new Set<keyof Settings>([
   'commitStagedHeight'
 ]);
 
-/** The kinds of entry that are an error, thrown or shown, and so print where the log is. */
-const POINTS_TO_LOG = new Set<DiagnosticKind>([DIAGNOSTIC_ERROR, DIAGNOSTIC_SHOWN]);
+/** The kinds of entry that are an error, thrown or shown. */
+const ERROR_KINDS = new Set<DiagnosticKind>([DIAGNOSTIC_ERROR, DIAGNOSTIC_SHOWN]);
 
 /** How much of a failing command's output the timeline keeps. Enough to read the error. */
 const MAX_OUTPUT_LINES = 12;
@@ -126,39 +126,25 @@ export function record(
     ring.splice(0, ring.length - DIAGNOSTICS_RING_DEPTH);
   }
   sessionSink?.(entry);
-  if (POINTS_TO_LOG.has(kind))
+  if (ERROR_KINDS.has(kind))
   {
-    pointToSessionLog();
+    errorListener?.();
   }
 }
 
-/**
- * Say on the main process's console, and in the system log Console shows, where this
- * run's log is, beside the error that makes it worth reading: nobody should have to
- * remember the logs directory to find it. Here, where every window's errors arrive, so
- * one place covers them all.
- *
- * Once per burst: an uncaught error arrives as thrown and again as shown, and a failure
- * that repeats would otherwise bury its own messages under pointers to the same file.
- */
-function pointToSessionLog(): void
+/** Told each time an error is recorded: see `errorCapture.ts`, which decides what follows. */
+let errorListener: (() => void) | null = null;
+
+export function onErrorRecorded(listener: () => void): void
 {
-  const path = sessionLogPath();
-  const now = Date.now();
-  if (!path || now - lastPointedAt < POINTER_QUIET_MS)
-  {
-    return;
-  }
-  lastPointedAt = now;
-  const pointer = `Diagnostics log: ${path}`;
-  console.error(pointer);
-  writeToSystemLog(pointer);
+  errorListener = listener;
 }
 
-/** How long after one pointer to the log another error goes without its own. */
-const POINTER_QUIET_MS = 1000;
-
-let lastPointedAt = 0;
+/** The repository the timeline is about: the last one opened. */
+export function currentRepository(): string | null
+{
+  return currentRepoRoot;
+}
 
 export function getDiagnostics(): DiagnosticEntry[]
 {
@@ -276,9 +262,32 @@ export function noteCommand(id: string, detail?: readonly string[]): void
  * unable to tell a dialog that never appeared from one the user thought better of. Most
  * of this app is dialogs, so most of what a report has to explain happens in one.
  */
-export function noteDialog(what: 'opened' | 'raised' | 'closed', name: string): void
+export function noteDialog(
+  what: 'opened' | 'raised' | 'closed',
+  name: string,
+  payload?: unknown
+): void
 {
-  record(DIAGNOSTIC_NOTE, `dialog ${what}: ${name}`);
+  // What it was opened on: the ref, the commits, the paths. "dialog opened: merge" says
+  // which form; only the payload says what it was about to act on.
+  if (payload === undefined)
+  {
+    record(DIAGNOSTIC_NOTE, `dialog ${what}: ${name}`);
+    return;
+  }
+  record(DIAGNOSTIC_NOTE, `dialog ${what}: ${name}`, { detail: [`payload ${clip(JSON.stringify(payload))}`] });
+}
+
+/** Past this, a value written into the timeline is cut: a line, not a dump. */
+const MAX_VALUE_CHARS = 600;
+
+function clip(text: string): string
+{
+  if (text.length <= MAX_VALUE_CHARS)
+  {
+    return text;
+  }
+  return `${text.slice(0, MAX_VALUE_CHARS)}... (${text.length} chars)`;
 }
 
 /** A thrown error from either process. `where` says which, since the report cannot tell. */
@@ -304,12 +313,14 @@ export function watchGitCommands(): void
     {
       return;
     }
-    const said = outputOf(entry);
+    // What was piped in, as well as what failed: a staged patch is the half of a staging
+    // step the argv cannot show, and each one is kept, not only the newest.
+    const said = [...stdinLines(entry), ...(outputOf(entry) ?? [])];
     const extra: Parameters<typeof record>[2] = {
       durationMs: entry.durationMs,
       exitCode: entry.exitCode
     };
-    if (said)
+    if (said.length > 0)
     {
       extra.detail = said;
     }

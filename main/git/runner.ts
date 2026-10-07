@@ -11,6 +11,7 @@ import { existsSync } from 'node:fs';
 import {
   GIT_KIND_READ,
   GIT_KIND_WRITE,
+  MAX_RECORD_OUTPUT,
   type GitCommandKind,
   type GitCommandRecord
 } from '@shared/types.js';
@@ -211,6 +212,10 @@ function execute(
   if (options.optional === true)
   {
     record.optional = true;
+  }
+  if (options.stdin !== undefined)
+  {
+    record.stdin = options.stdin.slice(0, MAX_RECORD_OUTPUT);
   }
 
   pushRecord(record);

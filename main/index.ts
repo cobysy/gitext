@@ -14,6 +14,7 @@ import {
   watchGitCommands,
   writeCrashReport
 } from './diagnostics/index.js';
+import { installErrorCapture } from './diagnostics/errorCapture.js';
 import { resolveGit } from './git/env.js';
 import { setCommandLogDepth } from './git/runner.js';
 import { registerIpcHandlers } from './ipc/index.js';
@@ -104,6 +105,7 @@ void app.whenReady().then(async () =>
   // Before anything else runs a command: the timeline is only worth reading if it
   // starts at the beginning.
   startSessionLog(() => getSettings().redactDiagnostics);
+  installErrorCapture();
   watchGitCommands();
   installCrashCapture();
 
