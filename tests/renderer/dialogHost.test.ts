@@ -57,6 +57,7 @@ vi.mock('@renderer/api.js', () => ({
     // vitest reports as an error against the run whether or not an assertion noticed.
     'repo:revision': () => Promise.resolve(null),
     'refs:list': () => Promise.resolve([]),
+    'refs:merged': () => Promise.resolve([]),
     'remote:list': () => Promise.resolve([]),
     'stash:list': () => Promise.resolve([]),
     'worktree:list': () => Promise.resolve([]),
