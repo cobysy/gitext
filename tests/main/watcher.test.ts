@@ -7,11 +7,28 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { isChurn, isChurnIn } from '@main/watcher.js';
+import { isChurn as isChurnWith, isChurnIn as isChurnInWith } from '@main/watchIgnore.js';
 
 const CLONE = '/w/proj/.git';
 const SUBMODULE = '/w/proj/.git/modules/lib';
 const WORKTREE = '/w/proj/.git/worktrees/feature';
+/** A submodule named after its path, so its name is two segments. */
+const DEEP_SUBMODULE = '/w/proj/.git/modules/vendor/lfs';
+/** A submodule of that submodule. */
+const NESTED_SUBMODULE = `${SUBMODULE}/modules/inner`;
+
+const GIT_DIRS = new Set([CLONE, SUBMODULE, WORKTREE, DEEP_SUBMODULE, NESTED_SUBMODULE]);
+const isGitDir = (path: string): boolean => GIT_DIRS.has(path);
+
+function isChurn(gitDir: string, path: string): boolean
+{
+  return isChurnWith(gitDir, path, isGitDir);
+}
+
+function isChurnIn(gitDirs: readonly string[], path: string): boolean
+{
+  return isChurnInWith(gitDirs, path, isGitDir);
+}
 
 describe('isChurn', () =>
 {
@@ -53,6 +70,55 @@ describe('isChurn', () =>
     expect(isChurn(WORKTREE, `${WORKTREE}/COMMIT_EDITMSG`)).toBe(true);
     expect(isChurn(WORKTREE, `${WORKTREE}/index.lock`)).toBe(true);
     expect(isChurn(WORKTREE, `${WORKTREE}/HEAD`)).toBe(false);
+  });
+
+  /**
+   * Watching the shared directory watches every linked worktree's own directory nested in
+   * it, and `fs.watch` on the daemon's socket there fails just as it does at the top.
+   */
+  it('ignores a linked worktree’s churn seen from the shared directory', () =>
+  {
+    expect(isChurn(CLONE, `${WORKTREE}/fsmonitor--daemon.ipc`)).toBe(true);
+    expect(isChurn(CLONE, `${WORKTREE}/fsmonitor--daemon/cookies/1`)).toBe(true);
+    expect(isChurn(CLONE, `${WORKTREE}/COMMIT_EDITMSG`)).toBe(true);
+    expect(isChurn(CLONE, `${WORKTREE}/HEAD`)).toBe(false);
+    expect(isChurn(CLONE, `${WORKTREE}/MERGE_HEAD`)).toBe(false);
+  });
+
+  /** Opening the superproject watches every submodule's git directory along with its own. */
+  it('ignores a submodule’s churn seen from the superproject', () =>
+  {
+    expect(isChurn(CLONE, `${SUBMODULE}/objects/ab`)).toBe(true);
+    expect(isChurn(CLONE, `${SUBMODULE}/fsmonitor--daemon.ipc`)).toBe(true);
+    expect(isChurn(CLONE, `${SUBMODULE}/COMMIT_EDITMSG`)).toBe(true);
+    expect(isChurn(CLONE, `${SUBMODULE}/HEAD`)).toBe(false);
+    expect(isChurn(CLONE, `${SUBMODULE}/refs/heads/objects`)).toBe(false);
+  });
+
+  it('finds a submodule’s git directory however many segments its name takes', () =>
+  {
+    expect(isChurn(CLONE, `${DEEP_SUBMODULE}/objects/ab`)).toBe(true);
+    expect(isChurn(CLONE, `${DEEP_SUBMODULE}/fsmonitor--daemon.ipc`)).toBe(true);
+    expect(isChurn(CLONE, `${DEEP_SUBMODULE}/HEAD`)).toBe(false);
+    expect(isChurn(CLONE, DEEP_SUBMODULE)).toBe(false);
+  });
+
+  it('follows a submodule’s own submodules down', () =>
+  {
+    expect(isChurn(CLONE, `${NESTED_SUBMODULE}/objects/ab`)).toBe(true);
+    expect(isChurn(CLONE, `${NESTED_SUBMODULE}/HEAD`)).toBe(false);
+  });
+
+  /**
+   * A name segment is only a name: the git directory it belongs to decides what is churn,
+   * so a worktree called `objects` is watched like any other.
+   */
+  it('does not ignore a nested git directory that happens to be named like an ignored one', () =>
+  {
+    const objects = `${CLONE}/worktrees/objects`;
+    const withObjects = (path: string): boolean => path === objects || isGitDir(path);
+    expect(isChurnWith(CLONE, `${objects}/HEAD`, withObjects)).toBe(false);
+    expect(isChurnWith(CLONE, `${objects}/objects/ab`, withObjects)).toBe(true);
   });
 
   /**

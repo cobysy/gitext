@@ -4,55 +4,11 @@
  */
 
 import chokidar, { type FSWatcher } from 'chokidar';
-import { join, relative, sep } from 'node:path';
+import { join, relative } from 'node:path';
 import { EventEmitter } from 'node:events';
+import { cachedGitDirProbe, ignoredUnder } from './watchIgnore.js';
 
 const DEBOUNCE_MS = 300;
-
-/**
- * Directories that churn without UI meaning. `fsmonitor--daemon` holds the cookie files
- * a repo on `core.fsmonitor` writes to prove its daemon is alive and caught up: one per
- * query, so a busy repo rewrites it constantly and none of it is repository state.
- */
-const IGNORED_DIRECTORIES = ['objects', 'lfs', 'fsmonitor--daemon'];
-
-/**
- * Files that churn. `fsmonitor--daemon.ipc` is not a file at all: it is the Unix socket
- * `git fsmonitor--daemon` listens on, and `fs.watch` on a socket fails outright with
- * `UNKNOWN` rather than quietly watching nothing.
- */
-const IGNORED_FILES = ['COMMIT_EDITMSG', 'fsmonitor--daemon.ipc'];
-
-const LOCK_SUFFIX = '.lock';
-
-/**
- * Is path churn (relative to gitDir). Submodules/worktrees have different
- * git dir paths; pattern must handle all.
- */
-export function isChurn(gitDir: string, path: string): boolean
-{
-  const inside = relative(gitDir, path);
-  if (inside === '' || inside.startsWith('..'))
-  {
-    return false;
-  }
-  const [top = ''] = inside.split(sep);
-  return (
-    IGNORED_DIRECTORIES.includes(top) ||
-    inside.endsWith(LOCK_SUFFIX) ||
-    IGNORED_FILES.includes(inside)
-  );
-}
-
-/**
- * Is path churn to any of the directories being watched. A linked worktree's git
- * directory sits *inside* the shared one, so a path can be read against either; churn to
- * one is churn, since the two views disagree only about how much of the path they see.
- */
-export function isChurnIn(gitDirs: readonly string[], path: string): boolean
-{
-  return gitDirs.some((gitDir) => isChurn(gitDir, path));
-}
 
 interface Entry {
   watcher: FSWatcher;
@@ -104,7 +60,7 @@ export function watchRepo(repoPath: string, gitDirs?: readonly string[]): void
     targets = [join(repoPath, '.git')];
   }
   const watcher = chokidar.watch(targets, {
-    ignored: (path: string) => isChurnIn(targets, path),
+    ignored: ignoredUnder(targets, cachedGitDirProbe()),
     ignoreInitial: true,
     // Wait for writes to settle; git rewrites refs and the index in bursts.
     awaitWriteFinish: { stabilityThreshold: 150, pollInterval: 50 },
