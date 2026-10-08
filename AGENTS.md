@@ -6,7 +6,13 @@
 
 ## Status
 
-**Nothing in flight.** Conflicts that appear while another application is in front no
+**Nothing in flight.** The `.git` watcher skips what `fs.watch` cannot watch (a socket or
+a FIFO, read from its stats), and reads churn under a nested git directory, a linked
+worktree's at `worktrees/<name>` or a submodule's at `modules/<name>`, against that
+directory's own root (`main/watchIgnore.ts`). The fsmonitor daemon's socket in each
+worktree used to fail the watch with `UNKNOWN`.
+
+Before that, conflicts that appear while another application is in front no
 longer raise the resolver: whoever made them is resolving them there, and the banner
 reports them on return (`standsDown` in `main/ipc/handlers/dialogs.ts`). A driven run
 counts as in front, so the suite still sees the raise.
