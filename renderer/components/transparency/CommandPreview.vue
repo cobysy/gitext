@@ -5,40 +5,28 @@
 
 import { computed, ref } from 'vue';
 import { copyText } from '@renderer/clipboard.js';
+import { gitCommandLine } from '@renderer/model/commandLine.js';
 
 const props = defineProps<{
   /** The argv to display: exactly what will be handed to git. */
   argv?: string[];
-  /** The argvs `runSteps` will walk, for an operation that is several commands. */
-  steps?: { argv: string[] }[];
+  /**
+   * The argvs `runSteps` will walk, for an operation that is several commands. A step
+   * that is not git (moving a folder to the Trash) has no argv and says what it does in
+   * `note`, drawn as a shell comment: so the strip still pastes into a shell as-is, and
+   * nothing that is not a git command is ever drawn as one.
+   */
+  steps?: { argv: string[]; note?: string }[];
   /** Shown instead of a command when the form is incomplete. */
   placeholder?: string;
 }>();
 
 const copied = ref(false);
 
-/**
- * POSIX-quote an argument for display and for pasting into a shell.
- *
- * `~` is safe everywhere except as the first character, where a shell would expand it to
- * a home directory: so `HEAD~1` is shown as typed and `~/repo` is still quoted. It is
- * worth the extra clause because revision expressions are the arguments people read most
- * often here, and `'HEAD~1'` is noise around the one part of the command that carries the
- * meaning. `^` stays quoted: it is a pipe operator in cmd.exe.
- */
-function quote(arg: string): string
-{
-  if (arg.length > 0 && /^[A-Za-z0-9_@%+=:,./-][A-Za-z0-9_@%+=:,./~-]*$/.test(arg))
-  {
-    return arg;
-  }
-  return `'${arg.replaceAll("'", `'\\''`)}'`;
-}
-
 /** Both props normalize to the same thing: the list of commands about to run. */
 const commands = computed(() =>
 {
-  let fromArgv: { argv: string[] }[];
+  let fromArgv: { argv: string[]; note?: string }[];
   if (props.argv)
   {
     fromArgv = [{ argv: props.argv }];
@@ -47,9 +35,18 @@ const commands = computed(() =>
   {
     fromArgv = [];
   }
-  return (props.steps ?? fromArgv)
-    .filter((step) => step.argv.length > 0)
-    .map((step) => `git ${step.argv.map(quote).join(' ')}`);
+  return (props.steps ?? fromArgv).flatMap((step) =>
+  {
+    if (step.note)
+    {
+      return [`# ${step.note}`];
+    }
+    if (step.argv.length > 0)
+    {
+      return [gitCommandLine(step.argv)];
+    }
+    return [];
+  });
 });
 
 /** What the copy button puts on the clipboard: the whole plan, one command per line. */

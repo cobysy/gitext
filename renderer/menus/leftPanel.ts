@@ -4,7 +4,7 @@
  * node kind and gets a menu, so nothing in the component decides what a branch can do.
  */
 
-import { KIND_SECTION, type PanelNodeKind } from '@renderer/panel.js';
+import { folderPathIn, KIND_FOLDER, KIND_SECTION, type PanelNodeKind } from '@renderer/panel.js';
 import { hideIfUnavailable, item, separator, type MenuNode } from './resolve.js';
 
 /**
@@ -59,6 +59,7 @@ const branchMenu: MenuNode[] = [
   item('ref.delete'),
   separator,
   item('panel.copyName'),
+  item('branch.manage'),
   ...arrangeMenu
 ];
 
@@ -146,11 +147,15 @@ const worktreeMenu: MenuNode[] = [
   ...arrangeMenu
 ];
 
+/** A folder of branches: everything in it is one pick in the branch manager. */
+const branchFolderMenu: MenuNode[] = [item('branch.manage'), ...arrangeMenu];
+
 /** A section header's menu: what can be created in it, then the arrangement. One map, not six near-identical exports: the shape is the same, the difference is three ids. */
 const sectionMenus: Record<string, MenuNode[]> = {
   'section:branches': [
     item('branch.create'),
     item('branch.checkout'),
+    item('branch.manage'),
     separator,
     ...arrangeMenu
   ],
@@ -193,12 +198,16 @@ const kindMenus: Record<Exclude<PanelNodeKind, 'section'>, MenuNode[]> = {
   worktree: worktreeMenu
 };
 
-/** The menu for a node. Sections differ by *which* section, so they're looked up by node id; everything else differs only by kind. An unknown section falls back to the arrangement menu. */
+/** The menu for a node. Sections differ by *which* section, and folders by which section they are in, so both are looked up by node id; everything else differs only by kind. An unknown section falls back to the arrangement menu. */
 export function menuFor(kind: PanelNodeKind, nodeId: string): MenuNode[]
 {
   if (kind === KIND_SECTION)
   {
     return sectionMenus[nodeId] ?? arrangeMenu;
+  }
+  if (kind === KIND_FOLDER && folderPathIn(nodeId, 'branches') !== null)
+  {
+    return branchFolderMenu;
   }
   return kindMenus[kind];
 }

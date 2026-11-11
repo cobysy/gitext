@@ -4,16 +4,16 @@
  * `-d` refuses unmerged branches one at a time; show which ones would require `-D`.
  */
 
-import { computed, onMounted, ref } from 'vue';
-import { api } from '@renderer/api.js';
-import { buildDeleteBranchArgs } from '@renderer/model/args/branch.js';
+import { computed, ref } from 'vue';
 import { useRepoStore } from '@renderer/stores/repo.js';
 import { useRepoObjectsStore } from '@renderer/stores/repoObjects.js';
 import { useDialog } from '@renderer/composables/useDialog.js';
+import { useBranchDeletion } from '@renderer/composables/useBranchDeletion.js';
 import DialogFrame from '@renderer/components/ui/DialogFrame.vue';
-import DangerNote from '@renderer/components/ui/DangerNote.vue';
+import DeleteButton from '@renderer/components/ui/DeleteButton.vue';
 import FormCheck from '@renderer/components/ui/FormCheck.vue';
 import FormCheckList from '@renderer/components/ui/FormCheckList.vue';
+import ForceDeleteBranches from '@renderer/components/dialogs/parts/ForceDeleteBranches.vue';
 import CommandPreview from '@renderer/components/transparency/CommandPreview.vue';
 import { REFS } from '@shared/invalidation.js';
 import { REF_KIND_BRANCH } from '@shared/types.js';
@@ -53,7 +53,6 @@ function choose(name: string, on: boolean): void
   }
   chosen.value = next;
 }
-const force = ref(false);
 
 // Every local branch except the currently checked-out one (git refuses to delete it anyway).
 const candidates = computed(() =>
@@ -64,62 +63,9 @@ const selected = computed(() =>
   candidates.value.filter((entry) => chosen.value.has(entry.name))
 );
 
-// Branches already in HEAD. Read here, not from store: dialogs have no grid for selection.
-const mergedIntoHead = ref<ReadonlySet<string>>(new Set());
-
-const unmerged = computed(() =>
-  selected.value.filter((entry) => !mergedIntoHead.value.has(entry.fullName))
-);
-
-const argv = computed(() =>
-  buildDeleteBranchArgs(
-    selected.value.map((entry) => entry.name),
-    force.value
-  )
-);
-
-/**
- * The command as built would be refused by git.
- *
- * An unmerged branch is ticked and `--force` is not, so `git branch --delete` will fail.
- * The dialog already knows this: it says so in the checkbox hint. Offering an enabled
- * button that cannot work is the preview promising something it will not deliver, so the
- * primary waits until the form asks for something git will accept.
- */
-const wouldBeRefused = computed(() => unmerged.value.length > 0 && !force.value);
+const { force, unmerged, argv, wouldBeRefused, deleteLabel, isMerged } = useBranchDeletion(selected);
 
 const currentBranch = computed(() => repo.repo?.branch ?? null);
-
-/**
- * What the primary promises. A bare count reads as a stray digit when it is `1`: the
- * number is worth saying once there is a number to say, and what it counts with it.
- */
-const deleteLabel = computed(() =>
-{
-  if (selected.value.length > 1)
-  {
-    return `Delete ${selected.value.length} Branches`;
-  }
-  return 'Delete Branch';
-});
-
-onMounted(async () =>
-{
-  const path = repo.repo?.path;
-  if (!path)
-  {
-    return;
-  }
-  try
-  {
-    mergedIntoHead.value = new Set(await api['refs:merged'](path, 'HEAD'));
-  }
-  catch
-  {
-    // Empty set errs towards showing the unmerged warning.
-    mergedIntoHead.value = new Set();
-  }
-});
 </script>
 
 <template>
@@ -141,29 +87,14 @@ onMounted(async () =>
           :label="`\`${entry.name}\``"
           @update:model-value="(on: boolean) => choose(entry.name, on)"
           :hint="
-            mergedIntoHead.has(entry.fullName)
+            isMerged(entry)
               ? undefined
               : 'Not merged, its commits become unreachable.'
           "
         />
       </FormCheckList>
 
-      <FormCheck
-        v-model="force"
-        label="Delete even the ones that are not merged"
-        :disabled="!unmerged.length"
-        :hint="
-          unmerged.length
-            ? `\`--force\`: ${unmerged.map((entry) => `\`${entry.name}\``).join(', ')} would otherwise be refused.`
-            : 'Everything selected is already merged.'
-        "
-      />
-
-      <DangerNote v-if="force && unmerged.length">
-        {{ unmerged.length }}
-        {{ unmerged.length === 1 ? 'branch has' : 'branches have' }} commits on no other
-        branch. Deleting them leaves those commits reachable only through the reflog.
-      </DangerNote>
+      <ForceDeleteBranches v-model="force" :unmerged="unmerged" />
 
       <CommandPreview :argv="argv" placeholder="Pick at least one branch" />
       <p v-if="error" class="error">{{ error }}</p>
@@ -171,13 +102,13 @@ onMounted(async () =>
 
     <template #actions>
       <button @click="emit('close')">Cancel</button>
-      <button
+      <DeleteButton
         :class="force ? 'danger' : 'primary'"
         :disabled="busy || !selected.length || wouldBeRefused"
         @click="run(argv, REFS)"
       >
         {{ busy ? 'Deleting…' : deleteLabel }}
-      </button>
+      </DeleteButton>
     </template>
   </DialogFrame>
 </template>

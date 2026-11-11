@@ -23,6 +23,7 @@ import { useDialog } from '@renderer/composables/useDialog.js';
 import { useRepoStore } from '@renderer/stores/repo.js';
 import { useUiStore } from '@renderer/stores/ui.js';
 import DialogFrame from '@renderer/components/ui/DialogFrame.vue';
+import DeleteButton from '@renderer/components/ui/DeleteButton.vue';
 import DangerNote from '@renderer/components/ui/DangerNote.vue';
 import FormCheck from '@renderer/components/ui/FormCheck.vue';
 import FormText from '@renderer/components/ui/FormText.vue';
@@ -243,7 +244,8 @@ async function remove(): Promise<void>
     message:
       'Empties the working tree and drops the entry. Its clone stays under `.git/modules`.',
     confirmLabel: 'Remove it',
-    danger: true
+    danger: true,
+    deletes: true
   });
   if (!ok)
   {
@@ -384,7 +386,7 @@ onMounted(load);
           <div class="actions">
             <button :disabled="busy" @click="open(current, false)">Open</button>
             <button :disabled="busy" @click="open(current, true)">Open in New Window</button>
-            <button class="del" :disabled="busy" @click="remove">Remove</button>
+            <DeleteButton class="del" :disabled="busy" @click="remove">Remove</DeleteButton>
           </div>
         </template>
 

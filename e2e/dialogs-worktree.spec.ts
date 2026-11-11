@@ -11,6 +11,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { originOf } from './fixtures/dialogsRepo.js';
+import { Dialog } from './support/dialog.js';
 import { waitForConsole } from './support/console.js';
 import {
   refreshApp,
@@ -21,7 +22,7 @@ import {
   selectWorkingTreeRow
 } from './support/grid.js';
 import { openViaPalette, runViaPalette } from './support/palette.js';
-import { expandPanel, selectPanelNode } from './support/panel.js';
+import { expandPanel, runFromPanelMenu, selectPanelNode } from './support/panel.js';
 import { settle } from './support/options.js';
 import { IDENT } from './support/repo.js';
 import { DIALOG_SETTINGS } from './support/dialogsTour.js';
@@ -572,3 +573,99 @@ test('delete a branch on the remote, and the local one tracking it', async ({
  * commits rather than using the fixture's: rewording rewrites history, so a step that
  * reworded `base` would move the ground under every step that names it.
  */
+
+/**
+ * A directory of worktrees beside the repository, detached so no branch is tied up:
+ * `<repo>-<folder>/<name>`, which is how a pile of them accumulates. Named after the
+ * repository so two runs never share one, and emptied first so a failed run's leftovers
+ * do not refuse the next. Hands back the folder's name and the paths in it.
+ */
+function worktreeFolder(
+  repo: { dir: string; mustGit: (args: string[]) => string },
+  folder: string,
+  names: string[]
+): { label: string; paths: string[] }
+{
+  const label = `${path.basename(repo.dir)}-${folder}`;
+  const root = path.join(path.dirname(repo.dir), label);
+  fs.rmSync(root, { recursive: true, force: true });
+  const paths = names.map((name) => path.join(root, name));
+  for (const where of paths)
+  {
+    repo.mustGit(['worktree', 'add', '-q', '--detach', where, 'HEAD']);
+  }
+  return { label, paths };
+}
+
+function worktreesStillListed(repo: { git: (args: string[]) => string }, paths: string[]): string[]
+{
+  const listed = repo.git(['worktree', 'list', '--porcelain']);
+  return paths.filter((where) => listed.includes(where));
+}
+
+test('manage worktrees: a folder row deletes a directory of them in one go', async ({ app, repo }, testInfo) =>
+{
+  const { label, paths } = worktreeFolder(repo, 'doomed-wt', ['a', 'b', 'c']);
+  await refreshApp(app);
+
+  const dialog = await openViaPalette(app, 'Manage Worktrees', 'Manage Worktrees');
+  await dialog.selectEntry(`${label}/`);
+  await testInfo.attach('preview', { body: await dialog.preview() });
+  await dialog.click('Delete 3 Worktrees');
+  await dialog.confirm();
+
+  await expect(
+    () => expect(worktreesStillListed(repo, paths), 'a worktree in the folder survived').toEqual([]),
+  ).toPass({ timeout: 8000 });
+  await app.closeDialogs();
+});
+
+test('manage worktrees: the panel row picks its worktree, and Cmd-click adds another', async ({ app, repo }, testInfo) =>
+{
+  const { paths } = worktreeFolder(repo, 'pair-wt', ['pair-one', 'pair-two']);
+  await refreshApp(app);
+
+  await runFromPanelMenu(app, 'pair-one', 'Worktrees', 'Delete Worktree');
+  const dialog = new Dialog(await app.waitForAnyDialog(8000, 'Manage Worktrees'));
+  await dialog.addEntry('pair-two');
+  await testInfo.attach('preview', { body: await dialog.preview() });
+  await dialog.click('Delete 2 Worktrees');
+  await dialog.confirm();
+
+  await expect(
+    () => expect(worktreesStillListed(repo, paths), 'a picked worktree survived').toEqual([]),
+  ).toPass({ timeout: 8000 });
+  await app.closeDialogs();
+});
+
+/**
+ * The fast delete keeps git's refusals: the directory goes to the Trash only once it has
+ * been asked what `git worktree remove` would have asked. An untracked file is refused
+ * until the box is ticked, and nothing is moved before then.
+ */
+test('manage worktrees: one with changes is refused, then trashed with the box ticked', async ({ app, repo }, testInfo) =>
+{
+  const { paths } = worktreeFolder(repo, 'dirty-wt', ['dirty']);
+  const [dirty] = paths as [string];
+  fs.writeFileSync(path.join(dirty, 'untracked.txt'), 'not committed\n');
+  await refreshApp(app);
+
+  const dialog = await openViaPalette(app, 'Manage Worktrees', 'Manage Worktrees');
+  await dialog.selectEntry('dirty');
+  await dialog.click('Delete');
+  await dialog.confirm();
+  await expect(dialog.page.locator('.error'), 'the refusal was not shown').toContainText('untracked');
+  expect(fs.existsSync(dirty), 'a refused worktree was moved anyway').toBe(true);
+  expect(worktreesStillListed(repo, paths), 'a refused worktree was dropped').toEqual(paths);
+
+  await dialog.tick('Delete them even with uncommitted changes in them');
+  await testInfo.attach('preview', { body: await dialog.preview() });
+  await dialog.click('Delete');
+  await dialog.confirm();
+  await expect(() =>
+  {
+    expect(worktreesStillListed(repo, paths), 'the forced worktree survived').toEqual([]);
+    expect(fs.existsSync(dirty), 'the directory was left where it was').toBe(false);
+  }).toPass({ timeout: 8000 });
+  await app.closeDialogs();
+});

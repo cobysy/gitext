@@ -25,6 +25,7 @@ import { useUiStore } from '@renderer/stores/ui.js';
 import { useDiffStore } from '@renderer/stores/diff.js';
 import { useDialog } from '@renderer/composables/useDialog.js';
 import DialogFrame from '@renderer/components/ui/DialogFrame.vue';
+import DeleteButton from '@renderer/components/ui/DeleteButton.vue';
 import FormCheck from '@renderer/components/ui/FormCheck.vue';
 import CommandPreview from '@renderer/components/transparency/CommandPreview.vue';
 import RepoFilePanes from '@renderer/components/dialogs/parts/RepoFilePanes.vue';
@@ -164,6 +165,7 @@ async function dropStash(): Promise<void>
     message: `${entry.message}\n\nA dropped stash is in the reflog of no branch and is hard to recover.`,
     confirmLabel: 'Drop it',
     danger: true,
+    deletes: true,
     rememberKey: 'stash.drop'
   });
   if (!confirmed)
@@ -243,7 +245,7 @@ onMounted(async () =>
 
     <template #actions>
       <button @click="close">Close</button>
-      <button class="danger" :disabled="busy || !current" @click="dropStash">Drop</button>
+      <DeleteButton class="danger" :disabled="busy || !current" @click="dropStash">Drop</DeleteButton>
       <button :disabled="busy || !current" @click="applyStash(false)">Apply</button>
       <button class="primary" :disabled="busy || !current" @click="applyStash(true)">
         Pop

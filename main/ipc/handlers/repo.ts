@@ -4,6 +4,7 @@
  * asks before it can be filled in.
  */
 
+import { existsSync } from 'node:fs';
 import { dialog, shell } from 'electron';
 import { noteRepository } from '@main/diagnostics/index.js';
 import { openTerminal, revealInFinder } from '@main/externalOpen.js';
@@ -32,7 +33,8 @@ import { listRemotes } from '@main/git/remote.js';
 import { getRepoInfo, getRepoState, getStatus, resolveWatchedGitDirs } from '@main/git/repo.js';
 import { listStashes } from '@main/git/stash.js';
 import { listSubmodules, submoduleStatus } from '@main/git/submodule.js';
-import { listWorktrees } from '@main/git/worktree.js';
+import { checkWorktreeRemovable, listWorktrees } from '@main/git/worktree.js';
+import { moveToTrash } from '@main/trash.js';
 import { forgetRecentRepo, recordRecentRepo } from '@main/settings.js';
 import { unwatchRepo, watchRepo } from '@main/watcher.js';
 import {
@@ -139,6 +141,16 @@ export function registerRepoHandlers(): void
   handle('remote:list', (repoPath) => listRemotes(repoPath));
   handle('stash:list', (repoPath) => listStashes(repoPath));
   handle('worktree:list', (repoPath) => listWorktrees(repoPath));
+  // Checked first, then moved: the order git keeps, since a moved directory can no
+  // longer be asked whether it was clean. A directory already gone has nothing to move.
+  handleWrite('worktree:trash', ['worktrees'], async (repoPath, worktreePath, force) =>
+  {
+    await checkWorktreeRemovable(repoPath, worktreePath, force);
+    if (existsSync(worktreePath))
+    {
+      await moveToTrash(worktreePath);
+    }
+  });
   handle('submodule:list', (repoPath) => listSubmodules(repoPath));
   handle('submodule:status', (repoPath) => submoduleStatus(repoPath));
 

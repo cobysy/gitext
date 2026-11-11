@@ -20,6 +20,7 @@ const DIALOG_BRANCH_SET_UPSTREAM = 'branch.setUpstream';
 const DIALOG_BRANCH_DELETE = 'branch.delete';
 const DIALOG_BRANCH_DELETE_REMOTE = 'branch.deleteRemote';
 const DIALOG_BRANCH_CLEANUP = 'branch.cleanup';
+const DIALOG_BRANCH_MANAGE = 'branch.manage';
 const DIALOG_REMOTE_PULL = 'remote.pull';
 const DIALOG_BRANCH_MERGE = 'branch.merge';
 const DIALOG_BRANCH_REBASE = 'branch.rebase';
@@ -74,6 +75,10 @@ export function propsFor(name: DialogName, payload: DialogPayload): Record<strin
     case DIALOG_BRANCH_DELETE_REMOTE:
       // Both optional and narrowing: a branch row names the branch and ticks it, a remote row names the remote and lists its branches with none ticked.
       return { gitRef: payload.ref, remoteName: payload.remoteName };
+    case DIALOG_BRANCH_MANAGE:
+      // Optional: the panel's selected branch, when it is one the window can delete, or
+      // the folder of branches it has selected.
+      return { branchName: payload.branchName, branchFolder: payload.branchFolder };
     case DIALOG_BRANCH_CLEANUP:
       // Acts on the repository, not one ref, so the path is the whole operand.
       return { repoPath: payload.repoPath ?? '' };

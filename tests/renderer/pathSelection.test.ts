@@ -16,6 +16,7 @@ import {
   EMPTY_SELECTION,
   pickPath,
   pickPaths,
+  selectModeOf,
   stepPath,
   type PathSelection
 } from '@renderer/pathSelection.js';
@@ -172,5 +173,26 @@ describe('stepping with the arrow keys', () =>
   {
     const before = at(['a.ts']);
     expect(stepPath(before, 'a.ts', 1, [])).toBe(before);
+  });
+});
+
+describe('selectModeOf', () =>
+{
+  const click = { shiftKey: false, metaKey: false, ctrlKey: false };
+
+  it('replaces on a plain click', () =>
+  {
+    expect(selectModeOf(click)).toBe('replace');
+  });
+
+  it('extends on Shift, whatever else is held', () =>
+  {
+    expect(selectModeOf({ ...click, shiftKey: true, metaKey: true, ctrlKey: true })).toBe('range');
+  });
+
+  // Both flags, so the platform's own accelerator is held whichever one it reads.
+  it('toggles on the accelerator', () =>
+  {
+    expect(selectModeOf({ ...click, metaKey: true, ctrlKey: true })).toBe('toggle');
   });
 });

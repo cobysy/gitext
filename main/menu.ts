@@ -357,6 +357,7 @@ function buildMenu(): Menu
         // Housekeeping you go looking for, which is what a Branch menu is; it was in
         // Repository's maintenance submenu, two levels from the subject it acts on.
         cmd('Clean Up Merged Branches…', 'branch.cleanup'),
+        cmd('Manage Branches…', 'branch.manage'),
         SEP,
         // Two rows do not earn a menu of their own, and a tag is a ref like a branch.
         {

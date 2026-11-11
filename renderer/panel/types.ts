@@ -53,6 +53,23 @@ export const SECTION_KINDS: Record<PanelSectionId, PanelNodeKind> = {
 /** A section's node id. One place builds it, so nothing else has to know the format. */
 export const sectionNodeId = (id: PanelSectionId): string => `section:${id}`;
 
+const FOLDER_ID_PREFIX = 'folder:';
+
+/** A folder's node id: what it groups (`branches`, a remote's name) and its path, `feature/ui`. */
+export const folderNodeId = (scope: string, path: string): string =>
+  `${FOLDER_ID_PREFIX}${scope}:${path}`;
+
+/** A folder node's path in that scope with its trailing slash, `feature/ui/`, or null for any other node. */
+export function folderPathIn(nodeId: string, scope: string): string | null
+{
+  const prefix = folderNodeId(scope, '');
+  if (!nodeId.startsWith(prefix) || nodeId.length === prefix.length)
+  {
+    return null;
+  }
+  return `${nodeId.slice(prefix.length)}/`;
+}
+
 /**
  * Sections open when a repository is first shown: branches (what the panel is for),
  * remotes (where a fetch/compare target lives), and worktrees (this window's own is

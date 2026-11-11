@@ -620,6 +620,127 @@ test('delete two branches at once, forcing the unmerged one', async ({ app, repo
 });
 
 /**
+ * The branch manager, which stays open: so each step closes it itself, and reads git
+ * rather than waiting for the window to go.
+ */
+test('manage branches: pick two and delete them in one go', async ({ app, repo }, testInfo) =>
+{
+  repo.git(['branch', '-f', 'doomed-manage-a', 'main']);
+  repo.git(['branch', '-f', 'doomed-manage-b', 'main']);
+  await refreshApp(app);
+
+  await runFromPanelMenu(app, 'Branches', undefined, 'Manage Branches');
+  const dialog = new Dialog(await app.waitForAnyDialog(8000, 'Manage Branches'));
+  expect(await dialog.title(), 'the section header opened the wrong dialog').toBe('Manage Branches');
+  await dialog.selectEntry('doomed-manage-a');
+  await dialog.addEntry('doomed-manage-b');
+  const preview = await dialog.preview();
+  await testInfo.attach('preview', { body: preview });
+  expect(preview, 'the pick did not reach the argv').toContain('doomed-manage-a doomed-manage-b');
+  await dialog.click('Delete 2 Branches');
+
+  await expect(() =>
+  {
+    const names = repo.branches();
+    expect(names, 'the first branch survived').not.toContain('doomed-manage-a');
+    expect(names, 'the second branch survived').not.toContain('doomed-manage-b');
+  }).toPass({ timeout: 8000 });
+  await app.closeDialogs();
+});
+
+test('manage branches: Select Merged picks the merged ones only', async ({ app, repo }, testInfo) =>
+{
+  repo.git(['branch', '-f', 'kept-merged', 'main']);
+  repo.git(['checkout', '-q', '-B', 'kept-unmerged', 'main']);
+  repo.write('kept.txt', 'only here\n');
+  repo.git(['add', '.']);
+  repo.git([...IDENT, 'commit', '-q', '-m', 'unmerged work']);
+  repo.git(['checkout', '-q', 'main']);
+  await refreshApp(app);
+
+  const dialog = await openViaPalette(app, 'Manage Branches', 'Manage Branches');
+  await dialog.click('Select Merged');
+  // Read, never run: Select Merged also picks the fixture's own merged branches.
+  await expect(async () =>
+  {
+    const preview = await dialog.preview();
+    expect(preview, 'a merged branch was not picked').toContain('kept-merged');
+    expect(preview, 'an unmerged branch was picked').not.toContain('kept-unmerged');
+    expect(preview, 'the checked-out branch was picked').not.toMatch(/ main( |$)/);
+  }).toPass({ timeout: 8000 });
+  await testInfo.attach('preview', { body: await dialog.preview() });
+  await app.closeDialogs();
+});
+
+test('manage branches: force-delete the unmerged branch a row named', async ({ app, repo }, testInfo) =>
+{
+  repo.git(['checkout', '-q', '-B', 'doomed-manage-unmerged', 'main']);
+  repo.write('doomed-manage.txt', 'only here\n');
+  repo.git(['add', '.']);
+  repo.git([...IDENT, 'commit', '-q', '-m', 'unmerged work']);
+  repo.git(['checkout', '-q', 'main']);
+  await refreshApp(app);
+
+  await runFromPanelMenu(app, 'doomed-manage-unmerged', 'Branches', 'Manage Branches');
+  const dialog = new Dialog(await app.waitForAnyDialog(8000, 'Manage Branches'));
+  await expect(
+    dialog.button('Delete Branch'),
+    'an unmerged branch must not be deletable without `--force`'
+  ).toBeDisabled();
+  await dialog.tick('Delete even the ones that are not merged');
+  await testInfo.attach('preview', { body: await dialog.preview() });
+  await dialog.click('Delete Branch');
+
+  await expect(
+    () => expect(repo.branches(), 'the unmerged branch survived the force').not.toContain('doomed-manage-unmerged'),
+  ).toPass({ timeout: 8000 });
+  await app.closeDialogs();
+});
+
+/** A folder of branches, the way one author's or one tool's pile up: `author/1` … `author/5`. */
+function branchFolder(repo: { git: (args: string[]) => string }, folder: string): string[]
+{
+  const names = [1, 2, 3, 4, 5].map((n) => `${folder}/${n}`);
+  for (const name of names)
+  {
+    repo.git(['branch', '-f', name, 'main']);
+  }
+  return names;
+}
+
+test('manage branches: delete a folder of branches from the panel', async ({ app, repo }, testInfo) =>
+{
+  const names = branchFolder(repo, 'doomed-folder');
+  await refreshApp(app);
+
+  await runFromPanelMenu(app, 'doomed-folder', 'Branches', 'Manage Branches');
+  const dialog = new Dialog(await app.waitForAnyDialog(8000, 'Manage Branches'));
+  await testInfo.attach('preview', { body: await dialog.preview() });
+  await dialog.click('Delete 5 Branches');
+
+  await expect(
+    () => expect(repo.branches().filter((name) => names.includes(name)), 'a branch in the folder survived').toEqual([]),
+  ).toPass({ timeout: 8000 });
+  await app.closeDialogs();
+});
+
+test('manage branches: a folder row picks everything under it', async ({ app, repo }, testInfo) =>
+{
+  const names = branchFolder(repo, 'doomed-row');
+  await refreshApp(app);
+
+  const dialog = await openViaPalette(app, 'Manage Branches', 'Manage Branches');
+  await dialog.selectEntry('doomed-row/');
+  await testInfo.attach('preview', { body: await dialog.preview() });
+  await dialog.click('Delete 5 Branches');
+
+  await expect(
+    () => expect(repo.branches().filter((name) => names.includes(name)), 'a branch in the folder survived').toEqual([]),
+  ).toPass({ timeout: 8000 });
+  await app.closeDialogs();
+});
+
+/**
  * Deleting a branch from the commit it sits on.
  *
  * The operand is the submenu row, so what is checked is that the dialog opened with that

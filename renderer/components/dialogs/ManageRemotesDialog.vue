@@ -23,6 +23,7 @@ import { useDialog } from '@renderer/composables/useDialog.js';
 import { useUiStore } from '@renderer/stores/ui.js';
 import CodeText from '@renderer/components/ui/CodeText.vue';
 import DialogFrame from '@renderer/components/ui/DialogFrame.vue';
+import DeleteButton from '@renderer/components/ui/DeleteButton.vue';
 import FormText from '@renderer/components/ui/FormText.vue';
 import CommandPreview from '@renderer/components/transparency/CommandPreview.vue';
 import { REFS } from '@shared/invalidation.js';
@@ -246,7 +247,8 @@ async function remove(): Promise<void>
     message:
       'The remote and its tracking branches go. The server is untouched.',
     confirmLabel: 'Remove it',
-    danger: true
+    danger: true,
+    deletes: true
   });
   if (!ok)
   {
@@ -395,9 +397,9 @@ onMounted(load);
           <button :disabled="busy || !editable || isNew" @click="prune">
             Prune stale branches
           </button>
-          <button class="del" :disabled="busy || !editable || isNew" @click="remove">
+          <DeleteButton class="del" :disabled="busy || !editable || isNew" @click="remove">
             Remove
-          </button>
+          </DeleteButton>
         </div>
       </div>
     </div>

@@ -35,6 +35,7 @@ export const DIALOG_COMPONENTS: Record<DialogName, () => Promise<DialogModule>> 
   'branch.delete': () => import('@renderer/components/dialogs/DeleteBranchDialog.vue'),
   'branch.deleteRemote': () => import('@renderer/components/dialogs/DeleteRemoteBranchDialog.vue'),
   'branch.cleanup': () => import('@renderer/components/dialogs/CleanUpBranchesDialog.vue'),
+  'branch.manage': () => import('@renderer/components/dialogs/ManageBranchesDialog.vue'),
   'branch.merge': () => import('@renderer/components/dialogs/MergeBranchDialog.vue'),
   'branch.rebase': () => import('@renderer/components/dialogs/RebaseDialog.vue'),
 

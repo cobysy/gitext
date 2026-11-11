@@ -8,6 +8,7 @@ import { useSettingsStore } from '@renderer/stores/settings.js';
 import { useUiStore } from '@renderer/stores/ui.js';
 import CodeText from '@renderer/components/ui/CodeText.vue';
 import DialogFrame from '@renderer/components/ui/DialogFrame.vue';
+import DeleteButton from '@renderer/components/ui/DeleteButton.vue';
 import { KEY_ENTER, KEY_ESCAPE } from '@renderer/keys.js';
 
 
@@ -120,7 +121,15 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 
     <template #actions>
       <button @click="answer(false)">Cancel</button>
+      <DeleteButton
+        v-if="ui.confirmRequest.deletes"
+        :class="ui.confirmRequest.danger ? 'danger' : 'primary'"
+        @click="answer(true)"
+      >
+        {{ ui.confirmRequest.confirmLabel ?? 'OK' }}
+      </DeleteButton>
       <button
+        v-else
         :class="ui.confirmRequest.danger ? 'danger' : 'primary'"
         @click="answer(true)"
       >

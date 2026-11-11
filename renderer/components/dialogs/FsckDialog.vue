@@ -26,6 +26,7 @@ import { useDialog } from '@renderer/composables/useDialog.js';
 import { useRepoStore } from '@renderer/stores/repo.js';
 import { useUiStore } from '@renderer/stores/ui.js';
 import DialogFrame from '@renderer/components/ui/DialogFrame.vue';
+import DeleteButton from '@renderer/components/ui/DeleteButton.vue';
 import FormCheck from '@renderer/components/ui/FormCheck.vue';
 import CommandPreview from '@renderer/components/transparency/CommandPreview.vue';
 import LostObjectPreview from './parts/LostObjectPreview.vue';
@@ -255,7 +256,8 @@ async function deleteLostFoundTags(): Promise<void>
     message:
       'Removes the `LOST_FOUND_` tags. The commits become unreachable again.',
     confirmLabel: 'Delete them',
-    danger: true
+    danger: true,
+    deletes: true
   });
   if (!ok)
   {
@@ -302,7 +304,8 @@ async function prune(): Promise<void>
     message:
       '`git prune` deletes them. Anything untagged is gone for good.',
     confirmLabel: 'Delete them',
-    danger: true
+    danger: true,
+    deletes: true
   });
   if (!ok)
   {
@@ -397,11 +400,11 @@ async function prune(): Promise<void>
          Escape closes it like every dialog. A fifth button doing nothing new would crowd
          out the four that act, two of which delete things. -->
     <template #actions>
-      <button :disabled="busy" @click="deleteLostFoundTags">Delete Recovery Tags</button>
+      <DeleteButton :disabled="busy" @click="deleteLostFoundTags">Delete Recovery Tags</DeleteButton>
       <button :disabled="busy" @click="saveToLostFound">
         Save to <code>.git/lost-found</code>
       </button>
-      <button class="danger" :disabled="busy" @click="prune">Delete Unreachable…</button>
+      <DeleteButton class="danger" :disabled="busy" @click="prune">Delete Unreachable…</DeleteButton>
       <button
         class="primary"
         :disabled="busy || pickedCommits.length === 0"

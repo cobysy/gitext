@@ -13,7 +13,7 @@
  * a rect is not one of these, and belongs to whichever component wants it.
  */
 
-export type GlyphName = 'diffFile' | 'textFile' | 'blameFile' | 'folder' | 'stash';
+export type GlyphName = 'diffFile' | 'textFile' | 'blameFile' | 'folder' | 'stash' | 'trash';
 
 export interface Glyph {
   strokeWidth: number;
@@ -51,6 +51,11 @@ export const GLYPHS: Record<GlyphName, Glyph> = {
   stash: {
     strokeWidth: 1.2,
     paths: ['M2.6 5 8 2.2 13.4 5 8 7.8z', 'M2.6 8 8 10.8 13.4 8', 'M2.6 11 8 13.8 13.4 11']
+  },
+  // A bin with its lid on: the button that deletes something, wherever it is.
+  trash: {
+    strokeWidth: 1.2,
+    paths: ['M2.8 4.2h10.4', 'M6.2 4.2V2.6h3.6v1.6', 'M4.2 4.2l.7 9.2h6.2l.7-9.2', 'M6.8 6.6v4.6M9.2 6.6v4.6']
   }
 };
 

@@ -20,6 +20,7 @@ import {
 import { comparisonOptions, defaultComparison } from '@renderer/model/cleanupComparison.js';
 import type { BranchCleanupReport, StaleBranchReason } from '@shared/types.js';
 import DialogFrame from '@renderer/components/ui/DialogFrame.vue';
+import DeleteButton from '@renderer/components/ui/DeleteButton.vue';
 import FormSelect from '@renderer/components/ui/FormSelect.vue';
 import CommandPreview from '@renderer/components/transparency/CommandPreview.vue';
 import { FETCH, REFS } from '@shared/invalidation.js';
@@ -325,9 +326,9 @@ watch(comparison, scan);
 
     <template #actions>
       <button @click="emit('close')">Cancel</button>
-      <button class="danger" :disabled="pickedCount === 0 || busy" @click="run">
+      <DeleteButton class="danger" :disabled="pickedCount === 0 || busy" @click="run">
         {{ deleteLabel }}
-      </button>
+      </DeleteButton>
     </template>
   </DialogFrame>
 </template>

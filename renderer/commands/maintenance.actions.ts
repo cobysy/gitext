@@ -31,7 +31,8 @@ async function deleteIndexLock(): Promise<void>
     message:
       'Deleting a `.git/index.lock` a running git still holds corrupts its write.',
     confirmLabel: 'Delete it',
-    danger: true
+    danger: true,
+    deletes: true
   });
   if (!ok)
   {

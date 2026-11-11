@@ -3,7 +3,7 @@
  * knows only sortName/sortDate and PanelNode.
  */
 
-import type { PanelNode, TreeOptions } from '../types.js';
+import { folderNodeId, type PanelNode, type TreeOptions } from '../types.js';
 
 const SORT_DATE = 'date';
 
@@ -96,7 +96,7 @@ export function foldPaths(leaves: SortableLeaf[], idPrefix: string, options: Tre
       .map(([name, child]) => ({
         name,
         node: {
-          id: `folder:${idPrefix}:${path}${name}`,
+          id: folderNodeId(idPrefix, `${path}${name}`),
           kind: 'folder' as const,
           label: name,
           children: emit(child, `${path}${name}/`)

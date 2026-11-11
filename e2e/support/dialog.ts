@@ -27,6 +27,9 @@ function exactly(text: string): RegExp
   return new RegExp(`^\\s*${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`);
 }
 
+/** The modifiers a dispatched click carries: what a selection reads off the event. */
+type ClickModifiers = Pick<MouseEventInit, 'metaKey' | 'ctrlKey' | 'shiftKey'>;
+
 /**
  * One dialog window, and the form primitives for driving it.
  *
@@ -174,12 +177,12 @@ export class Dialog
    * open on every press. Asked again until it lands, since a button being briefly
    * disabled is the app working, not failing.
    */
-  protected async press(target: Locator, what: string): Promise<void>
+  protected async press(target: Locator, what: string, modifiers: ClickModifiers = {}): Promise<void>
   {
     await expect(target, what).toBeEnabled();
     await expect(async () =>
     {
-      const landed = await target.evaluate((el) =>
+      const landed = await target.evaluate((el, held) =>
       {
         if (el instanceof HTMLButtonElement && el.disabled)
         {
@@ -189,9 +192,9 @@ export class Dialog
         {
           return false;
         }
-        el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        el.dispatchEvent(new MouseEvent('click', { bubbles: true, ...held }));
         return true;
-      });
+      }, modifiers);
       expect(landed, `${what} was still disabled`).toBe(true);
     }).toPass({ timeout: 8000 });
   }
@@ -326,11 +329,27 @@ export class Dialog
    */
   async selectEntry(name: string): Promise<void>
   {
-    const entry = this.page
+    await this.press(this.entryNamed(name), `a list entry named "${name}"`);
+  }
+
+  /**
+   * Add a row to a list's multi-selection: the accelerator held over the click. Both
+   * flags, so whichever one the platform reads as its accelerator is down.
+   */
+  async addEntry(name: string): Promise<void>
+  {
+    await this.press(this.entryNamed(name), `a list entry named "${name}"`, {
+      metaKey: true,
+      ctrlKey: true
+    });
+  }
+
+  private entryNamed(name: string): Locator
+  {
+    return this.page
       .locator('.entry')
       .filter({ has: this.page.locator('.title', { hasText: exactly(name) }) })
       .first();
-    await this.press(entry, `a list entry named "${name}"`);
   }
 
   /**

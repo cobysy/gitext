@@ -1,27 +1,39 @@
 <script setup lang="ts">
 /**
- * Worktree list: open, delete, or prune (stay open, same as remotes/stash dialogs).
- * Main worktree in list (cannot be removed; answers "which am I in?").
+ * The worktrees: a list you pick one or several out of, folded by directory, beside a
+ * pane that acts on the pick. Deleting takes the whole pick, one `git worktree remove`
+ * each; Open takes one. Pruning acts on the repository rather than the pick, so it sits
+ * in the footer. Stays open, like the other managers.
+ *
+ * The main worktree is listed though it cannot be removed: it answers "which am I in?".
  */
 
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref } from 'vue';
 import { api } from '@renderer/api.js';
 import {
   buildWorktreePruneArgs,
-  buildWorktreeRemoveArgs
+  buildWorktreeDiscardSteps,
+  DISCARD_TRASH,
+  type WorktreeDiscardStep
 } from '@renderer/model/args/worktree.js';
+import { isRemovable, treeEntries, worktreeStates } from '@renderer/model/worktreeList.js';
 import type { WorktreeEntry } from '@shared/types.js';
+import { useRepoObjectsStore } from '@renderer/stores/repoObjects.js';
+import type { FileRow } from '@renderer/filetree.js';
 import { useDialog } from '@renderer/composables/useDialog.js';
+import { useTreePicks } from '@renderer/composables/useTreePicks.js';
 import { useRepoStore } from '@renderer/stores/repo.js';
 import { useUiStore } from '@renderer/stores/ui.js';
 import DialogFrame from '@renderer/components/ui/DialogFrame.vue';
+import DeleteButton from '@renderer/components/ui/DeleteButton.vue';
 import FormCheck from '@renderer/components/ui/FormCheck.vue';
+import TreePickList from '@renderer/components/dialogs/parts/TreePickList.vue';
 import CommandPreview from '@renderer/components/transparency/CommandPreview.vue';
 import { READS } from '@shared/invalidation.js';
 
 const props = withDefaults(
   defineProps<{
-    /** Open with this row selected: the panel's Delete Worktree row names one. */
+    /** Open with this worktree picked: the panel's Delete Worktree row names one. */
     selectPath?: string;
   }>(),
   { selectPath: '' }
@@ -33,62 +45,124 @@ const repo = useRepoStore();
 const ui = useUiStore();
 const { busy, error, run, perform, close } = useDialog();
 
-const worktrees = ref<WorktreeEntry[]>([]);
-const loading = ref(true);
-const selected = ref<string | null>(props.selectPath || null);
+const objects = useRepoObjectsStore();
+
+/** The list every dialog window keeps and reloads when the repository moves, so a worktree added or removed anywhere shows here. */
+const worktrees = computed(() => objects.worktrees);
 const force = ref(false);
 /** What the last prune preview printed. */
 const prunePreview = ref<string | null>(null);
 
-const current = computed(() =>
-  worktrees.value.find((entry) => entry.path === selected.value) ?? null
+const openPath = computed(() => repo.repo?.path ?? null);
+
+const tree = computed(() => treeEntries(worktrees.value));
+const entries = computed(() => tree.value.entries);
+
+/** The payload's worktree, as its key in the tree: the list is loaded before a dialog mounts. */
+function initialPicks(): string[]
+{
+  const named = entries.value.find((entry) => entry.worktree.path === props.selectPath);
+  if (named)
+  {
+    return [named.path];
+  }
+  return [];
+}
+
+const { rows, picks, isPicked, pickRow, toggleFolder } = useTreePicks(entries, {
+  initial: initialPicks(),
+  // Dense: a directory of worktrees nested a few levels down is one row, not a chain.
+  dense: true
+});
+
+const picked = computed(() =>
+  entries.value.filter((entry) => picks.value.has(entry.path)).map((entry) => entry.worktree)
 );
 
-/** The one you are in. Its row is marked and its Delete is refused by git anyway. */
-const isCurrent = computed(() => current.value?.path === repo.repo?.path);
-
-/** True when `entry` is a worktree `git worktree remove` can actually be asked to drop. */
-function isRemovable(entry: WorktreeEntry | null, isCurrent: boolean): entry is WorktreeEntry
+const single = computed(() =>
 {
-  return !!entry && !entry.isMain && !isCurrent;
-}
+  if (picked.value.length === 1)
+  {
+    return picked.value[0]!;
+  }
+  return null;
+});
 
-const removeArgv = computed(() =>
-{
-  if (isRemovable(current.value, isCurrent.value))
-  {
-    return buildWorktreeRemoveArgs({ path: current.value.path, force: force.value });
-  }
-  else
-  {
-    return [];
-  }
-}
+const toRemove = computed(() => picked.value.filter((entry) => isRemovable(entry, openPath.value)));
+
+const kept = computed(() => picked.value.filter((entry) => !isRemovable(entry, openPath.value)));
+
+const steps = computed(() =>
+  buildWorktreeDiscardSteps(
+    toRemove.value.map((entry) => entry.path),
+    force.value
+  )
 );
 
 const prunable = computed(() => worktrees.value.filter((entry) => entry.prunable));
 
-async function load(): Promise<void>
+function detailOf(row: FileRow<{ path: string; worktree: WorktreeEntry }>): string
 {
-  const path = repo.repo?.path;
-  if (!path)
+  if (!row.file)
   {
-    return;
+    return '';
   }
-  loading.value = true;
-  try
-  {
-    worktrees.value = await api['worktree:list'](path);
-    if (!worktrees.value.some((entry) => entry.path === selected.value))
-    {
-      selected.value = worktrees.value[0]?.path ?? null;
-    }
-  }
-  finally
-  {
-    loading.value = false;
-  }
+  return worktreeStates(row.file.worktree, openPath.value).join(' · ');
 }
+
+const deleteLabel = computed(() =>
+{
+  if (toRemove.value.length > 1)
+  {
+    return `Delete ${toRemove.value.length} Worktrees`;
+  }
+  return 'Delete';
+});
+
+const pickSummary = computed(() =>
+{
+  if (picked.value.length === 0)
+  {
+    return 'Pick a worktree. Cmd-click or Shift-click picks several; a folder picks all of it.';
+  }
+  return `${picked.value.length} worktrees picked.`;
+});
+
+/** What the pane says about the one worktree picked. */
+const singleNote = computed(() =>
+{
+  const entry = single.value;
+  if (!entry)
+  {
+    return '';
+  }
+  if (entry.isMain)
+  {
+    return 'The repository\'s own working directory. It cannot be removed from here.';
+  }
+  if (entry.path === openPath.value)
+  {
+    return 'Open in this window. Open another first to remove it.';
+  }
+  if (entry.prunable)
+  {
+    return 'Its directory is gone. Prune forgets the record.';
+  }
+  return 'Deleting it removes the directory; the branch stays.';
+});
+
+const keptNote = computed(() =>
+{
+  if (single.value || kept.value.length === 0)
+  {
+    return '';
+  }
+  if (kept.value.length === 1)
+  {
+    return 'One of them cannot be removed from here, so it is left.';
+  }
+  return `${kept.value.length} of them cannot be removed from here, so they are left.`;
+});
 
 /** Open it in the window behind this one: see `repo:openHere`. */
 async function open(path: string): Promise<void>
@@ -98,39 +172,64 @@ async function open(path: string): Promise<void>
   });
 }
 
+/** One step of a delete: the move through its own channel, the record through git. */
+async function runDiscardStep(repoPath: string, step: WorktreeDiscardStep): Promise<void>
+{
+  if (step.kind === DISCARD_TRASH)
+  {
+    await api['worktree:trash'](repoPath, step.path, step.force);
+    return;
+  }
+  await api['git:run'](repoPath, step.argv, ['worktrees']);
+}
+
 async function remove(): Promise<void>
 {
-  const entry = current.value;
-  if (!entry || removeArgv.value.length === 0)
+  if (steps.value.length === 0)
   {
     return;
   }
 
-  let message: string;
-  if (force.value)
+  let title: string;
+  if (toRemove.value.length === 1)
   {
-    message =
-      'The directory and any uncommitted work in it are deleted.';
+    title = `Delete the worktree at ${toRemove.value[0]!.path}?`;
   }
   else
   {
-    message =
-      'The directory is deleted; the branch it had checked out stays.';
+    title = `Delete ${toRemove.value.length} worktrees?`;
   }
-  const ok = await ui.confirm({
-    title: `Delete the worktree at ${entry.path}?`,
-    message,
-    confirmLabel: 'Delete it',
-    danger: true
-  });
+  let message: string;
+  if (force.value)
+  {
+    message = 'The folders go to the Trash, uncommitted work and all.';
+  }
+  else
+  {
+    message = 'The folders go to the Trash; their branches stay.';
+  }
+  const ok = await ui.confirm({ title, message, confirmLabel: 'Delete', danger: true, deletes: true });
   if (!ok)
   {
     return;
   }
 
-  if (await run(removeArgv.value, ['worktrees'], { close: false }))
+  const plan = steps.value;
+  const done = await perform(
+    'Deleting the worktrees',
+    async (repoPath, watcher) =>
+    {
+      for (const [index, step] of plan.entries())
+      {
+        watcher.started({ label: step.label, argv: step.argv, index, count: plan.length, stop: null });
+        await runDiscardStep(repoPath, step);
+      }
+    },
+    { close: false }
+  );
+  if (done)
   {
-    await load();
+    force.value = false;
   }
 }
 
@@ -154,87 +253,61 @@ async function prune(): Promise<void>
   if (await run(buildWorktreePruneArgs(), ['worktrees'], { close: false }))
   {
     prunePreview.value = null;
-    await load();
   }
 }
-
-onMounted(load);
 </script>
 
 <template>
   <DialogFrame title="Manage Worktrees" fixed-height @close="emit('close')">
     <div class="split">
-      <ul class="list side">
-        <li v-for="entry in worktrees" :key="entry.path">
-          <button
-            class="entry"
-            :class="{ current: selected === entry.path }"
-            @click="selected = entry.path"
-          >
-            <span class="title truncate" :title="entry.path">{{ entry.path }}</span>
-            <span class="detail">
-              <!-- The branch is a ref and the two fallbacks are states, so only the ref
-                   is set as one. -->
-              <code v-if="entry.branch">{{ entry.branch }}</code>
-              <template v-else>{{ entry.isDetached ? 'detached' : 'no branch' }}</template>
-              <template v-if="entry.isMain"> · the repository</template>
-              <!-- Both, not one or the other: the main worktree is usually also the one
-                   this window has open, and which of the two you wanted to know is not
-                   for the list to decide. -->
-              <template v-if="entry.path === repo.repo?.path"> · you are here</template>
-              <template v-if="entry.isLocked"> · locked</template>
-              <template v-if="entry.prunable"> · missing</template>
+      <div class="side-column">
+        <p class="base truncate" :title="tree.base">{{ tree.base }}</p>
+        <TreePickList
+          :rows="rows"
+          :is-picked="isPicked"
+          empty="No worktrees."
+          @pick="pickRow"
+          @toggle="toggleFolder"
+        >
+          <template #detail="{ row }">
+            <span class="detail truncate">
+              <code v-if="row.file?.worktree.branch">{{ row.file.worktree.branch }}</code>
+              <template v-if="row.file?.worktree.branch && detailOf(row)"> · </template>
+              {{ detailOf(row) }}
             </span>
-          </button>
-        </li>
-      </ul>
+          </template>
+        </TreePickList>
+      </div>
 
       <div class="detail-pane">
-        <p v-if="loading" class="placeholder">Reading…</p>
-        <template v-else-if="current">
-          <div class="form">
-            <p class="hint">
-              <template v-if="current.isMain">
-                The repository's own working directory. It cannot be removed from here.
-              </template>
-              <template v-else-if="isCurrent">
-                Open on this window. Open another first to remove it.
-              </template>
-              <template v-else-if="current.prunable">
-                Its directory is gone. Prune forgets the record.
-              </template>
-              <template v-else>
-                {{ current.branch ? `On ${current.branch}.` : 'Detached.' }}
-                Deleting it removes the directory; the branch stays.
-              </template>
-            </p>
+        <div class="form">
+          <p v-if="single" class="hint">{{ singleNote }}</p>
+          <p v-else class="hint">{{ pickSummary }}</p>
+          <p v-if="keptNote" class="hint">{{ keptNote }}</p>
 
-            <FormCheck
-              v-if="!current.isMain && !isCurrent"
-              v-model="force"
-              label="Delete it even with uncommitted changes in it"
-              hint="`--force`: git refuses otherwise."
-            />
+          <FormCheck
+            v-model="force"
+            label="Delete them even with uncommitted changes in them"
+            hint="Otherwise one with changes is refused."
+            :disabled="!toRemove.length"
+          />
 
-            <CommandPreview
-              :argv="removeArgv"
-              placeholder="This worktree cannot be removed from here"
-            />
-            <p v-if="error" class="error">{{ error }}</p>
-          </div>
+          <CommandPreview :steps="steps" placeholder="Pick a worktree that can be removed" />
+          <p v-if="error" class="error">{{ error }}</p>
+        </div>
 
-          <div class="actions">
-            <button
-              :disabled="busy || isCurrent"
-              @click="open(current.path)"
-            >
-              Open
-            </button>
-            <button class="del" :disabled="busy || !removeArgv.length" @click="remove">
-              Delete
-            </button>
-          </div>
-        </template>
+        <!-- Always drawn, disabled where they do not apply, so the pane keeps its height. -->
+        <div class="actions">
+          <button
+            :disabled="busy || !single || single.path === openPath"
+            @click="single && open(single.path)"
+          >
+            Open
+          </button>
+          <DeleteButton class="del" :disabled="busy || !steps.length" @click="remove">
+            {{ deleteLabel }}
+          </DeleteButton>
+        </div>
 
         <div class="form">
           <p v-if="prunable.length" class="warn">
@@ -258,34 +331,15 @@ onMounted(load);
 <style scoped src="@renderer/styles/manageList.css"></style>
 <style scoped src="@renderer/styles/splitDialog.css"></style>
 <style scoped>
-/*
- * Truncate a path from the *left*.
- *
- * Every worktree of one repository shares a long prefix, so an ellipsis on the right cut
- * the only part that told them apart and drew two identical rows. `direction: rtl` moves
- * the ellipsis to the front; `unicode-bidi: plaintext` keeps the characters themselves in
- * their normal order, which a bare `rtl` would not.
- */
-.entry .title {
-  direction: rtl;
-  unicode-bidi: plaintext;
-  text-align: left;
-}
-
-
 /* The list picks the operand and the pane acts on it: the remotes dialog's division. */
-.side {
-  flex: none;
+.side-column {
   width: 260px;
 }
 
-.title {
-  font-size: var(--text-sm);
+/* Where every worktree lives, so the rows below can name only what differs. */
+.base {
+  margin: 0;
   font-family: var(--font-mono);
-  max-width: 100%;
-}
-
-.detail {
   font-size: var(--text-xs);
   color: var(--fg-subtle);
 }

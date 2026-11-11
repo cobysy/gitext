@@ -6,7 +6,7 @@
  * and `runner/gitError.ts` the shared error shape.
  */
 
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import {
   GIT_KIND_READ,
@@ -120,6 +120,8 @@ export interface RunOptions {
    * `runGitBuffer` only, since a blob decoded and re-encoded (an image from `git show`) comes back corrupted.
    */
   onBinary?: (chunk: Buffer) => void;
+  /** Kills the process when aborted: how a dialog's Stop reaches a run it did not stream. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -257,6 +259,8 @@ function execute(
     cwd,
     // Never a shell: argv is passed through verbatim, so no quoting rules apply.
     shell: false,
+    // A process group of its own, so stopping a run stops what git started too: see `killRun`.
+    detached: true,
     stdio,
     env: {
       ...process.env,
@@ -272,6 +276,18 @@ function execute(
       LC_ALL: 'C.UTF-8'
     }
   });
+
+  if (options.signal)
+  {
+    if (options.signal.aborted)
+    {
+      killRun(child);
+    }
+    else
+    {
+      options.signal.addEventListener('abort', () => killRun(child), { once: true });
+    }
+  }
 
   const done = new Promise<{ record: GitCommandRecord; stdout: string }>((resolve, reject) =>
   {
@@ -478,7 +494,32 @@ function execute(
     }
   });
 
-  return { record, done, cancel: () => child.kill() };
+  return { record, done, cancel: () => killRun(child) };
+}
+
+/**
+ * Stop a run, and everything it started.
+ *
+ * Killing git alone is not enough: a hook, a credential helper or the `script` wrapper
+ * outlives it holding its output pipes, and a run is not over until those close, so the
+ * dialog would sit at "Stopping" for as long as the hook took. The whole group goes
+ * instead, which `detached` made git the leader of. A group already gone is a run that
+ * already ended.
+ */
+function killRun(child: ChildProcess): void
+{
+  if (child.pid === undefined)
+  {
+    return;
+  }
+  try
+  {
+    process.kill(-child.pid, 'SIGTERM');
+  }
+  catch
+  {
+    child.kill();
+  }
 }
 
 /** Run git and resolve with stdout. Rejects with `GitError` on a non-zero exit. */
