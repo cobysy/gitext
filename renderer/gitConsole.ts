@@ -15,6 +15,7 @@ import type { GitStreamBatch } from '@shared/types.js';
 import { api, toMessage } from '@renderer/api.js';
 import { nextStreamRequestId } from '@renderer/composables/streamRequestId.js';
 import { useSettingsStore } from '@renderer/stores/settings.js';
+import type { StepWatcher } from '@renderer/composables/runActivity.js';
 
 /** One command to run, and what to call it if it fails. Mirrors `useDialog`'s `Step`. */
 export interface ConsoleStep {
@@ -45,6 +46,16 @@ export class ConsoleFailure extends Error
     this.name = 'ConsoleFailure';
     this.output = output;
     this.argv0 = argv[0] ?? '';
+  }
+}
+
+/** A run the user stopped: not a failure, so nothing about it opens the console. */
+export class StoppedRun extends Error
+{
+  constructor()
+  {
+    super('Stopped.');
+    this.name = 'StoppedRun';
   }
 }
 
@@ -137,6 +148,8 @@ export interface ConsoleOptions {
    * than progress: see `DialogPayload.outputKeepOpen`.
    */
   keepOpen?: boolean;
+  /** Told as each step starts, and asked whether Stop was pressed: see `runActivity.ts`. */
+  watcher?: StepWatcher;
 }
 
 /**
@@ -241,21 +254,51 @@ export async function runConsoleSteps(
     watched = openConsoleFor(steps, options);
   }
 
+  const watcher = options.watcher;
   let output = '';
   for (const [index, step] of steps.entries())
   {
     const streamed = watched[index];
     if (streamed)
     {
-      output = await streamStep(repoPath, streamed, invalidates);
+      watcher?.started({
+        ...step,
+        index,
+        count: steps.length,
+        stop: () => void api['stream:cancel'](streamed.requestId)
+      });
+      try
+      {
+        output = await streamStep(repoPath, streamed, invalidates);
+      }
+      catch (err)
+      {
+        if (watcher?.stopping)
+        {
+          throw new StoppedRun();
+        }
+        throw err;
+      }
       continue;
     }
+    // An id of its own, so the frame's Stop can name this run to main.
+    const runId = nextStreamRequestId();
+    watcher?.started({
+      ...step,
+      index,
+      count: steps.length,
+      stop: () => void api['git:cancel'](runId)
+    });
     try
     {
-      output = await api['git:run'](repoPath, step.argv, invalidates);
+      output = await api['git:run'](repoPath, step.argv, invalidates, runId);
     }
     catch (err)
     {
+      if (watcher?.stopping)
+      {
+        throw new StoppedRun();
+      }
       // Not being watched is a decision about a command that is *working*. One that
       // failed has something to say, so the console opens on it here.
       const said = toMessage(err);

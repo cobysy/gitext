@@ -22,6 +22,8 @@ export interface ConfirmRequest {
   confirmLabel?: string;
   /** Draw the confirming button as destructive. For anything that discards work. */
   danger?: boolean;
+  /** The confirming button deletes something, so it carries the bin, as every delete button does. */
+  deletes?: boolean;
   /** Offer "don't ask again", remembered under this key; Settings lists every key with a way to switch it back on. */
   rememberKey?: string;
 }

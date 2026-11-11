@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildWorktreeAddArgs,
   buildWorktreePruneArgs,
+  buildWorktreeDiscardSteps,
   buildWorktreeRemoveArgs
 } from '@renderer/model/args/worktree.js';
 import { toRepoRelative } from '@renderer/model/paths.js';
@@ -180,5 +181,41 @@ describe('toRepoRelative', () =>
   it('tolerates a trailing separator on either side', () =>
   {
     expect(toRepoRelative('/work/repo/', '/work/repo/wt/')).toBe('wt');
+  });
+});
+
+describe('buildWorktreeDiscardSteps', () =>
+{
+  it('trashes each directory, then has git drop its record, in order', () =>
+  {
+    const steps = buildWorktreeDiscardSteps(['/w/a', '/w/b']);
+    expect(steps.map((step) => [step.kind, step.argv])).toEqual([
+      ['trash', []],
+      ['git', ['worktree', 'remove', '/w/a']],
+      ['trash', []],
+      ['git', ['worktree', 'remove', '/w/b']]
+    ]);
+  });
+
+  // The record is dropped after the directory is gone, so git has nothing to force past:
+  // `--force` is the Trash step's to honour, by skipping its clean check.
+  it('carries --force to the Trash step, never to git', () =>
+  {
+    const steps = buildWorktreeDiscardSteps(['/w/a'], true);
+    expect(steps[0]).toMatchObject({ kind: 'trash', force: true });
+    expect(steps[1]?.argv).not.toContain('--force');
+    expect(steps[0]?.argv).toEqual([]);
+  });
+
+  it('says in the preview what is not git', () =>
+  {
+    expect(buildWorktreeDiscardSteps(['/w/a'])[0]).toMatchObject({
+      note: 'check /w/a is clean, then move it to the Trash'
+    });
+  });
+
+  it('is nothing for nothing picked', () =>
+  {
+    expect(buildWorktreeDiscardSteps([])).toEqual([]);
   });
 });

@@ -7,12 +7,11 @@ import { computed } from 'vue';
 import type { DiffFileEntry } from '@shared/diff.js';
 import { toFilePath, type FilePath } from '@renderer/model/paths.js';
 import { KEY_ARROW_DOWN, KEY_ARROW_UP, KEY_ENTER, KEY_SPACE } from '@renderer/keys.js';
-import { MODE_RANGE, MODE_REPLACE, MODE_TOGGLE } from '@renderer/pathSelection.js';
+import { MODE_REPLACE, MODE_TOGGLE, selectModeOf } from '@renderer/pathSelection.js';
 import {
   STAGING_SIDE_STAGED,
   useStagingStore,
-  type StagingSide,
-  type SelectMode
+  type StagingSide
 } from '@renderer/stores/staging.js';
 
 
@@ -61,20 +60,7 @@ export function useStagingSelection(opts: StagingSelectionOptions)
 
   function onRowClick(file: DiffFileEntry, event: MouseEvent): void
   {
-    let mode: SelectMode;
-    if (event.shiftKey)
-    {
-      mode = MODE_RANGE;
-    }
-    else if (event.metaKey || event.ctrlKey)
-    {
-      mode = MODE_TOGGLE;
-    }
-    else
-    {
-      mode = MODE_REPLACE;
-    }
-    staging.select(opts.side(), file.path, mode);
+    staging.select(opts.side(), file.path, selectModeOf(event));
   }
 
   /**

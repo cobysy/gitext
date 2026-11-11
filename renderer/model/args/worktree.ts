@@ -2,6 +2,8 @@
  * git worktree argv. Path relative (useRelativePaths set) so moving worktree pair doesn't break links.
  */
 
+import type { ArgvStep } from './checkout.js';
+
 const CHECKOUT_NEW_BRANCH = 'new-branch';
 const CHECKOUT_EXISTING_BRANCH = 'existing-branch';
 const CHECKOUT_DETACH = 'detach';
@@ -120,6 +122,48 @@ export function buildWorktreeRemoveArgs(options: WorktreeRemoveOptions): string[
   }
   args.push(path.trim());
   return args;
+}
+
+export const DISCARD_TRASH = 'trash' as const;
+export const DISCARD_GIT = 'git' as const;
+
+/**
+ * One step of deleting worktrees. Moving a directory to the Trash is not git, so it has
+ * no argv and says what it does in `note`, which the preview draws as a comment.
+ */
+export type WorktreeDiscardStep =
+  | { kind: typeof DISCARD_TRASH; label: string; path: string; force: boolean; argv: string[]; note: string }
+  | ({ kind: typeof DISCARD_GIT } & ArgvStep);
+
+/**
+ * Deleting worktrees fast: each directory to the Trash, then `git worktree remove` for
+ * git's record of it.
+ *
+ * `git worktree remove` deletes the directory itself, file by file, and that is all of
+ * its cost: a worktree with dependencies installed takes tens of seconds. Moved to the
+ * Trash first, a rename, the directory is gone in an instant and git finds only the
+ * record left to drop. Main refuses the move for whatever git would have refused the
+ * removal for (`checkWorktreeRemovable`), so nothing is lost that git would have kept.
+ * One pair per worktree, in order, so a refusal names the worktree it is about.
+ */
+export function buildWorktreeDiscardSteps(paths: readonly string[], force = false): WorktreeDiscardStep[]
+{
+  return paths.flatMap((path) =>
+  {
+    let note: string;
+    if (force)
+    {
+      note = `move ${path} to the Trash, changes and all`;
+    }
+    else
+    {
+      note = `check ${path} is clean, then move it to the Trash`;
+    }
+    return [
+      { kind: DISCARD_TRASH, label: `Moving ${path} to the Trash`, path, force, argv: [], note },
+      { kind: DISCARD_GIT, label: `Removing the worktree at ${path}`, argv: buildWorktreeRemoveArgs({ path }) }
+    ];
+  });
 }
 
 /**

@@ -18,6 +18,7 @@
 
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { api } from '@renderer/api.js';
+import RunningCommand from '@renderer/components/transparency/RunningCommand.vue';
 
 const props = withDefaults(
   defineProps<{
@@ -210,6 +211,9 @@ onBeforeUnmount(() =>
       </div>
 
       <footer v-if="$slots.actions" ref="footEl" class="actions">
+        <!-- What git is running, while it runs: on the footer's empty left, so a run
+             never resizes the window it is shown in. -->
+        <RunningCommand />
         <slot name="actions" />
       </footer>
     </div>

@@ -1093,3 +1093,12 @@ describe('the native menu bar', () =>
     expect(registeredIds.size).toBeGreaterThan(100);
   });
 });
+
+describe('branch folders', () =>
+{
+  it('offer the branch manager, which a folder of tags does not', () =>
+  {
+    expect(walkMenu(menuFor('folder', 'folder:branches:author'))).toContain('branch.manage');
+    expect(walkMenu(menuFor('folder', 'folder:tags:release'))).not.toContain('branch.manage');
+  });
+});

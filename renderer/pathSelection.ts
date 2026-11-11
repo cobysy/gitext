@@ -7,6 +7,7 @@
  */
 
 import { indexRange } from '@renderer/model/indexRange.js';
+import { isModPressed } from '@renderer/keys.js';
 
 export const MODE_TOGGLE = 'toggle' as const;
 export const MODE_RANGE = 'range' as const;
@@ -33,6 +34,20 @@ export interface PathSelection<P extends string = string> {
 
 /** Typed `PathSelection<never>`: an empty pick list and null anchor satisfy any `PathSelection<P>`, so this one constant is assignable everywhere. */
 export const EMPTY_SELECTION: PathSelection<never> = { picks: [], anchor: null };
+
+/** Which mode a click asks for, from the modifiers held: Shift extends, Mod toggles. */
+export function selectModeOf(event: { shiftKey: boolean; metaKey: boolean; ctrlKey: boolean }): SelectMode
+{
+  if (event.shiftKey)
+  {
+    return MODE_RANGE;
+  }
+  if (isModPressed(event))
+  {
+    return MODE_TOGGLE;
+  }
+  return MODE_REPLACE;
+}
 
 /** One path, in one of the three modes. A range with no anchor, or one no longer drawn, falls back to a plain click rather than doing nothing. */
 export function pickPath<P extends string>(

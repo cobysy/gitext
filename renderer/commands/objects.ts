@@ -60,6 +60,7 @@ export function registerObjectCommands(): void
   // Every merged branch at once, so no row in the panel is its operand: it lives in the
   // toolbar's maintenance menu, with the rest of the repo-wide housekeeping.
   declareCommand('branch.cleanup', 'Clean Up Merged Branches…', 'Branch', hasRepo);
+  declareCommand('branch.manage', 'Manage Branches…', 'Branch', hasRepo);
 
   // ── Remotes ─────────────────────────────────────────────────────────────────
   declareCommand('remote.pull', 'Pull / Fetch…', 'Remote', hasRepo, ['Mod+Shift+L']);

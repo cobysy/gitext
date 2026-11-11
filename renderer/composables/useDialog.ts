@@ -28,11 +28,12 @@
  * either way: it still awaits its run, still shows the failure, still closes on success.
  */
 
-import { ref, type Ref } from 'vue';
+import { provide, ref, type Ref } from 'vue';
 import type { RepoFacet } from '@shared/invalidation.js';
 import { api, toMessage } from '@renderer/api.js';
 import { noteShownError } from '@renderer/diagnostics.js';
-import { ConsoleFailure, runConsoleSteps } from '@renderer/gitConsole.js';
+import { ConsoleFailure, runConsoleSteps, StoppedRun } from '@renderer/gitConsole.js';
+import { createRunActivity, RUN_ACTIVITY, type StepWatcher } from './runActivity.js';
 import { useRepoStore } from '@renderer/stores/repo.js';
 import { useUiStore } from '@renderer/stores/ui.js';
 import { useAfterGitOperation } from './useAfterGitOperation.js';
@@ -116,10 +117,12 @@ export interface DialogController {
   /**
    * Run work that is not a `git:run` argv, a channel of its own, in the same shape.
    * `label` is the sentence its failure belongs to: "Creating the archive failed".
+   * Work of several steps reports each through `watcher`, which is what the frame's
+   * progress line draws.
    */
   perform: (
     label: string,
-    work: (repoPath: string) => Promise<void>,
+    work: (repoPath: string, watcher: StepWatcher) => Promise<void>,
     options?: RunOptions
   ) => Promise<boolean>;
   /** Close the dialog window. */
@@ -152,6 +155,10 @@ function describeFailure(labelled: string | readonly Step[], err: unknown): stri
     named = '';
   }
 
+  if (err instanceof StoppedRun)
+  {
+    return err.message;
+  }
   if (err instanceof ConsoleFailure)
   {
     if (named)
@@ -190,6 +197,10 @@ export function useDialog(): DialogController
   const error = ref('');
   const failureOutput = ref('');
 
+  // The frame draws what is running from this, so every dialog shows it unasked.
+  const running = createRunActivity();
+  provide(RUN_ACTIVITY, { activity: running.activity, stop: running.stop });
+
   function close(): void
   {
     void api['dialog:close']();
@@ -202,7 +213,8 @@ export function useDialog(): DialogController
    * is rolled back: a failure leaves the repository as git left it, with git's own stderr underneath.
    */
   async function attempt(
-    work: (repoPath: string) => Promise<void>,
+    label: string,
+    work: (repoPath: string, watcher: StepWatcher) => Promise<void>,
     describe: (err: unknown) => string,
     options: RunOptions
   ): Promise<boolean>
@@ -217,11 +229,12 @@ export function useDialog(): DialogController
     busy.value = true;
     error.value = '';
     failureOutput.value = '';
+    const watcher = running.begin(label);
     try
     {
       try
       {
-        await work(repoPath);
+        await work(repoPath, watcher);
       }
       catch (err)
       {
@@ -265,6 +278,7 @@ export function useDialog(): DialogController
     finally
     {
       busy.value = false;
+      running.end();
     }
   }
 
@@ -282,11 +296,13 @@ export function useDialog(): DialogController
     // operation when this run is watched, and opens it on a failure either way. A
     // checkout that stashes first is three commands and one thing the user asked for.
     return attempt(
-      async (repoPath) =>
+      steps[0]!.label,
+      async (repoPath, watcher) =>
       {
         await runConsoleSteps(repoPath, steps, invalidates, {
           console: options.console,
-          keepOpen: options.consoleKeepOpen
+          keepOpen: options.consoleKeepOpen,
+          watcher
         });
       },
       (err) => describeFailure(steps, err),
@@ -314,11 +330,11 @@ export function useDialog(): DialogController
 
   async function perform(
     label: string,
-    work: (repoPath: string) => Promise<void>,
+    work: (repoPath: string, watcher: StepWatcher) => Promise<void>,
     options: RunOptions = {}
   ): Promise<boolean>
   {
-    return attempt(work, (err) => describeFailure(label, err), options);
+    return attempt(label, work, (err) => describeFailure(label, err), options);
   }
 
   return { busy, error, failureOutput, run, runSteps, perform, close };

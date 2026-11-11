@@ -20,9 +20,11 @@ import { api, toMessage } from '@renderer/api.js';
 import { runConsoleSteps } from '@renderer/gitConsole.js';
 import { FETCH } from '@shared/invalidation.js';
 import { HEAD_REF } from '@renderer/model/sha.js';
+import { folderPathIn, type PanelSectionId } from '@renderer/panel.js';
 
 const BRANCH_SCOPE_ALL = 'all';
 const BRANCH_SCOPE_FILTERED = 'filtered';
+const BRANCHES_SECTION: PanelSectionId = 'branches';
 
 function selectedRef(): string | undefined
 {
@@ -149,6 +151,26 @@ export function implementObjectCommands(): void
 
   // No operand: `ui.openDialog` fills in the repository path, and the dialog reads every branch itself.
   implementCommand('branch.cleanup', () => useUiStore().openDialog('branch.cleanup'));
+
+  // Opens with what the panel has selected picked: a folder of branches, all of it; a
+  // branch, unless it is the checked-out one, since the window is mostly for deleting and
+  // a pick it cannot delete is nothing to open on.
+  implementCommand('branch.manage', () =>
+  {
+    const objects = useRepoObjectsStore();
+    const node = objects.selected;
+    let branchName: string | undefined;
+    if (node?.kind === KIND_BRANCH && !objects.refs.some((entry) => entry.name === node.ref && entry.isCurrent))
+    {
+      branchName = node.ref;
+    }
+    let branchFolder: string | undefined;
+    if (node)
+    {
+      branchFolder = folderPathIn(node.id, BRANCHES_SECTION) ?? undefined;
+    }
+    useUiStore().openDialog('branch.manage', { branchName, branchFolder });
+  });
 
   implementCommand('ref.delete', () =>
   {

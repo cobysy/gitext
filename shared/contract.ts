@@ -474,9 +474,18 @@ export interface Invocations {
   /**
    * Run git argv, returning stdout only (`stream:start` carries both streams live).
    * `facets` is required: every dialog's argv passes through this one channel, so it's
-   * the only place that can be made to declare what it invalidates.
+   * the only place that can be made to declare what it invalidates. `runId`, when given,
+   * is what `git:cancel` names it by.
    */
-  'git:run': (repoPath: string, argv: string[], facets: readonly RepoFacet[]) => string;
+  'git:run': (repoPath: string, argv: string[], facets: readonly RepoFacet[], runId?: number) => string;
+  /** Kill the `git:run` with this id: it rejects as git would on being killed. Nothing when it has finished. */
+  'git:cancel': (runId: number) => void;
+  /**
+   * Move a linked worktree's directory to the Trash, after refusing it for the reasons
+   * `git worktree remove` would. Leaves git's record of it, which `git worktree remove`
+   * then drops in an instant: what made that command slow was deleting the files.
+   */
+  'worktree:trash': (repoPath: string, worktreePath: string, force: boolean) => void;
 
   /**
    * Run git argv, streaming both output streams as they arrive: for a run worth
@@ -700,6 +709,8 @@ export const INVOKE_CHANNELS = [
   'diagnostics:autoSave',
   'diagnostics:openLogs',
   'git:run',
+  'git:cancel',
+  'worktree:trash',
   'stream:start',
   'stream:cancel',
   'stream:state',

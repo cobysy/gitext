@@ -18,6 +18,7 @@ import { useDialog } from '@renderer/composables/useDialog.js';
 import { useRepoObjectsStore } from '@renderer/stores/repoObjects.js';
 import { useUiStore } from '@renderer/stores/ui.js';
 import DialogFrame from '@renderer/components/ui/DialogFrame.vue';
+import DeleteButton from '@renderer/components/ui/DeleteButton.vue';
 import DangerNote from '@renderer/components/ui/DangerNote.vue';
 import FormCheck from '@renderer/components/ui/FormCheck.vue';
 import FormGroup from '@renderer/components/ui/FormGroup.vue';
@@ -120,7 +121,8 @@ async function clean(): Promise<void>
     message:
       'Deleted from disk. They are in no commit and no stash.',
     confirmLabel: 'Delete them',
-    danger: true
+    danger: true,
+    deletes: true
   });
   if (!ok)
   {
@@ -180,9 +182,9 @@ async function clean(): Promise<void>
       <button :disabled="busy" @click="runPreview">
         {{ busy ? 'Working…' : 'Preview' }}
       </button>
-      <button class="danger" :disabled="busy" @click="clean">
+      <DeleteButton class="danger" :disabled="busy" @click="clean">
         {{ busy ? 'Cleaning…' : 'Clean' }}
-      </button>
+      </DeleteButton>
     </template>
   </DialogFrame>
 </template>

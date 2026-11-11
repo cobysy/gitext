@@ -19,6 +19,8 @@ import {
   sectionNodeId,
   filterTree,
   flatten,
+  folderNodeId,
+  folderPathIn,
   moveSection,
   normalizeSections,
   walk,
@@ -789,5 +791,20 @@ describe('merged branches in the tree', () =>
   {
     const tree = built(new Set());
     expect(section(tree, 'branches').children.every((n) => n.isMerged === false)).toBe(true);
+  });
+});
+
+describe('folderPathIn', () =>
+{
+  it('reads back the path a folder id was built from, slash-terminated', () =>
+  {
+    expect(folderPathIn(folderNodeId('branches', 'author/sub'), 'branches')).toBe('author/sub/');
+  });
+
+  it('is null for a folder of another section, or for anything that is not a folder', () =>
+  {
+    expect(folderPathIn(folderNodeId('tags', 'release'), 'branches')).toBeNull();
+    expect(folderPathIn(sectionNodeId('branches'), 'branches')).toBeNull();
+    expect(folderPathIn(folderNodeId('branches', ''), 'branches')).toBeNull();
   });
 });

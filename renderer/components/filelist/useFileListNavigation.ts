@@ -22,8 +22,8 @@ import {
   type FileRow
 } from '@renderer/filetree.js';
 import { groupHeadingOf, isGroupView } from '@renderer/model/fileGroups.js';
-import { KEY_ARROW_DOWN, KEY_ARROW_LEFT, KEY_ARROW_RIGHT, KEY_ARROW_UP, KEY_END, KEY_ESCAPE, KEY_HOME, isModPressed } from '@renderer/keys.js';
-import { MODE_RANGE, MODE_REPLACE, MODE_TOGGLE, type SelectMode } from '@renderer/pathSelection.js';
+import { KEY_ARROW_DOWN, KEY_ARROW_LEFT, KEY_ARROW_RIGHT, KEY_ARROW_UP, KEY_END, KEY_ESCAPE, KEY_HOME } from '@renderer/keys.js';
+import { MODE_RANGE, MODE_REPLACE, selectModeOf, type SelectMode } from '@renderer/pathSelection.js';
 import type { PaneEntry } from '@renderer/model/fileRowDescription.js';
 
 /** Fixed row height, for the virtualizer's estimate and the row's own inline style. */
@@ -237,20 +237,7 @@ export function useFileListNavigation(opts: FileListNavigationOptions)
       opts.toggleFolder(row.key);
       return;
     }
-    let mode: typeof MODE_RANGE | typeof MODE_TOGGLE | typeof MODE_REPLACE;
-    if (event.shiftKey)
-    {
-      mode = MODE_RANGE;
-    }
-    else if (isModPressed(event))
-    {
-      mode = MODE_TOGGLE;
-    }
-    else
-    {
-      mode = MODE_REPLACE;
-    }
-    opts.selectPath(row.key, mode);
+    opts.selectPath(row.key, selectModeOf(event));
   }
 
   function focusRow(row: FileRow<PaneEntry> | undefined, extend = false): void

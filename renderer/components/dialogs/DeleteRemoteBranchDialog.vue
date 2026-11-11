@@ -17,6 +17,7 @@ import { useRepoStore } from '@renderer/stores/repo.js';
 import { useRepoObjectsStore } from '@renderer/stores/repoObjects.js';
 import { useDialog } from '@renderer/composables/useDialog.js';
 import DialogFrame from '@renderer/components/ui/DialogFrame.vue';
+import DeleteButton from '@renderer/components/ui/DeleteButton.vue';
 import DangerNote from '@renderer/components/ui/DangerNote.vue';
 import FormCheck from '@renderer/components/ui/FormCheck.vue';
 import FormCheckList from '@renderer/components/ui/FormCheckList.vue';
@@ -284,9 +285,9 @@ onMounted(async () =>
 
     <template #actions>
       <button @click="emit('close')">Cancel</button>
-      <button class="danger" :disabled="busy || !selected.length" @click="runSteps(steps, REFS)">
+      <DeleteButton class="danger" :disabled="busy || !selected.length" @click="runSteps(steps, REFS)">
         {{ busy ? 'Deleting…' : 'Delete on Remote' }}
-      </button>
+      </DeleteButton>
     </template>
   </DialogFrame>
 </template>

@@ -30,22 +30,43 @@ export function registerRunHandlers(): void
   // The one channel whose facets are an argument, not a property of the channel: it
   // carries argv from every dialog. That declaration also settles read/write, which no
   // argv sniff could (can't tell `branch --list` from `branch -d`).
-  handle('git:run', async (repoPath, argv, facets) =>
+  // The runs a renderer gave an id, so `git:cancel` can reach them: a dialog's Stop.
+  const cancellable = new Map<number, AbortController>();
+
+  handle('git:run', async (repoPath, argv, facets, runId) =>
   {
-    if (facets.length === 0)
+    let signal: AbortSignal | undefined;
+    if (runId !== undefined)
     {
-      return runGit(repoPath, argv, { kind: 'read' });
+      const controller = new AbortController();
+      cancellable.set(runId, controller);
+      signal = controller.signal;
     }
-    writeStarted(repoPath, facets);
     try
     {
-      return await runGit(repoPath, argv, { kind: 'write' });
+      if (facets.length === 0)
+      {
+        return await runGit(repoPath, argv, { kind: 'read', signal });
+      }
+      writeStarted(repoPath, facets);
+      try
+      {
+        return await runGit(repoPath, argv, { kind: 'write', signal });
+      }
+      finally
+      {
+        writeFinished(repoPath, facets);
+      }
     }
     finally
     {
-      writeFinished(repoPath, facets);
+      if (runId !== undefined)
+      {
+        cancellable.delete(runId);
+      }
     }
   });
+  handle('git:cancel', (runId) => cancellable.get(runId)?.abort());
 
   // The same escape hatch, for a run whose *running* matters on screen, not its result.
   // Facets are an argument for the identical reason. The hold is taken here and released

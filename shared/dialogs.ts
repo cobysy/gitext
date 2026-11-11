@@ -23,6 +23,7 @@ export type DialogName =
   | 'branch.delete'
   | 'branch.deleteRemote'
   | 'branch.cleanup'
+  | 'branch.manage'
   | 'branch.merge'
   | 'branch.rebase'
   // Reset
@@ -122,6 +123,8 @@ export interface DialogPayload {
   suggestedRef?: string;
   /** Branch name for rename, delete, and setting what a branch tracks. */
   branchName?: string;
+  /** A folder of branches, as `author/`: the branch manager opens with all of it picked. */
+  branchFolder?: string;
   /** Tag name, for the push dialog's tags tab. */
   tagName?: string;
   /**
@@ -304,6 +307,8 @@ export const DIALOG_WINDOWS: Record<DialogName, DialogWindowSpec> = {
   // Taller than the other branch dialogs: a list read before acting on it, so it
   // shouldn't open already scrolled.
   'branch.cleanup': { title: 'Clean Up Branches', width: 640, height: 620 },
+  // A list beside a pane, like the remotes dialog.
+  'branch.manage': { title: 'Manage Branches', width: 760, height: 560 },
   // The advanced panel is folded by default but has to fit when it opens.
   'branch.merge': {
     title: 'Merge Branch',

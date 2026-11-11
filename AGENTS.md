@@ -6,7 +6,44 @@
 
 ## Status
 
-**Nothing in flight.** The `.git` watcher skips what `fs.watch` cannot watch (a socket or
+**Nothing in flight.** A button that deletes carries a bin before its label: `DeleteButton`
+(`components/ui/`), over the `trash` glyph; a confirmation whose yes deletes says so with
+`deletes: true` and draws the same.
+
+Before that, every dialog shows what git is running once a run passes a second:
+the command, the step of how many, a clock, and Stop, on the footer's left
+(`transparency/RunningCommand.vue`). Nothing per dialog: `useDialog` provides the activity
+(`composables/runActivity.ts`) and `DialogFrame` draws it. Stop reaches a streamed run
+through `stream:cancel` and a buffered one through `git:cancel`, the id `git:run` now
+takes; the run's whole process group goes (`killRun`, `detached` in the runner), since a
+hook outliving git holds its pipes open, and a stopped run reads "Stopped." rather than
+failing (`StoppedRun`).
+
+Deleting worktrees is fast: `git worktree remove` spent all its time deleting files one
+by one, so each directory now goes to the Trash first (`worktree:trash`, a rename) after
+the refusals git would make (`checkWorktreeRemovable`: locked, changes, submodules), and
+`git worktree remove` then only drops the record. The preview draws the Trash step as a
+shell comment (`CommandPreview`'s `note`). A driven run moves into the temp folder rather
+than the real Trash (`main/trash.ts`).
+
+Before that, *Manage Branches…* (`ManageBranchesDialog`): the local branches
+as a list picked like a file list (`selectModeOf`: Cmd toggles, Shift extends), beside a
+pane that deletes the whole pick in one `branch --delete` and opens Checkout, Rename and
+Set Upstream for a single one. *Select Merged* picks what a plain `-d` would take. Offered
+on the Branches section header, a branch row, and the Branch menu. What git would refuse
+and the `--force` row are shared with *Delete Branches* (`useBranchDeletion`,
+`ForceDeleteBranches`). The list is a folder tree (`useBranchPicks`, over `filetree.ts`):
+a folder row picks every branch under it, collapsed or not, and a branch folder in the
+left panel opens the window with all of it picked (`folderPathIn`, `branchFolder`).
+
+*Manage Worktrees* works the same way: the list is a tree of paths relative to the
+directory they all share (`model/worktreeList.ts`), picked through the same
+`useTreePicks` and drawn by the same `TreePickList`, and Delete takes the whole pick as
+one `worktree remove` per path (`buildWorktreeRemoveSteps`). It reads the worktrees from
+the store every dialog window reloads, so one added outside the app shows without
+reopening it.
+
+Before that, the `.git` watcher skips what `fs.watch` cannot watch (a socket or
 a FIFO, read from its stats), and reads churn under a nested git directory, a linked
 worktree's at `worktrees/<name>` or a submodule's at `modules/<name>`, against that
 directory's own root (`main/watchIgnore.ts`). The fsmonitor daemon's socket in each
