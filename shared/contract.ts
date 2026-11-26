@@ -29,6 +29,7 @@ import type {
   LostObject,
   LogOptions,
   MessageFileName,
+  BranchCleanupProgress,
   BranchCleanupReport,
   RefEntry,
   RemoteEntry,
@@ -346,8 +347,14 @@ export interface Invocations {
   /**
    * Local branches whose work already landed on `comparison`. Its own channel: proving
    * a squash-merge landed costs subprocesses per branch, unlike `refs:list`'s watcher tick.
+   * Reports how far it has got on `event:cleanupProgress`, tagged with `requestId`.
+   * `null` when abandoned: the same window asked again before this one answered.
    */
-  'branch:stale': (repoPath: string, comparison: string) => BranchCleanupReport;
+  'branch:stale': (
+    requestId: number,
+    repoPath: string,
+    comparison: string
+  ) => BranchCleanupReport | null;
   'remote:list': (repoPath: string) => RemoteEntry[];
   'stash:list': (repoPath: string) => StashEntry[];
   /** Always at least one entry: the repository's own working tree is a worktree. */
@@ -604,6 +611,8 @@ export interface Events {
    * screen. See `dialog:goToRevision`.
    */
   'event:goToRevision': string;
+  /** How far a `branch:stale` scan has got, sent to the window that asked. */
+  'event:cleanupProgress': BranchCleanupProgress;
 }
 
 export type InvokeChannel = keyof Invocations;
@@ -732,7 +741,8 @@ export const EVENT_CHANNELS = [
   'event:showInFileTree',
   'event:applyLogFilter',
   'event:goToRevision',
-  'event:openRepo'
+  'event:openRepo',
+  'event:cleanupProgress'
 ] as const satisfies readonly EventChannel[];
 
 /**

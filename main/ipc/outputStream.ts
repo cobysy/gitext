@@ -42,7 +42,7 @@ export interface OutputStream {
 
 /** An output stream, broadcasting through `broadcast` and announcing invalidations through `changed`: this module has no business knowing how a change is announced. */
 export function createOutputStream(
-  broadcast: (channel: string, payload: GitStreamBatch) => void,
+  broadcast: (channel: typeof EVENT_STREAM_LINE, payload: GitStreamBatch) => void,
   changed: (repoPath: string, facets: readonly RepoFacet[]) => void
 ): OutputStream
 {

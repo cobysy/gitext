@@ -6,7 +6,20 @@
 
 ## Status
 
-**Nothing in flight.** A button that deletes carries a bin before its label: `DeleteButton`
+**Nothing in flight.** Clean Up Branches judges eight branches at once
+(`main/mapLimited.ts`, `PARALLEL_CHECKS` in `branchCleanup.ts`: 5s to 1s over 300
+branches) and says how far it has got ("Checking every local branch · 12 of 240"):
+`branch:stale` reports each branch on `event:cleanupProgress` to the window that asked
+(`main/sendTo.ts`, which every event main pushes now goes through, `broadcast`
+included), tagged with the dialog's request id. A scan stops once one check fails, or
+once its window asks again or closes, and settles only when nothing it started is still
+running; a new scan waits for the old one to stop, and the stopped one answers `null`
+(`main/ipc/cleanupScan.ts`, `latestOnly.ts`). One branch's judgement is
+`branchVerdict.ts`, the squash test `squashMerge.ts`. Git is handed full ref names
+throughout (the branch, the comparison, each upstream), so a tag sharing a name cannot
+stand in for any of them.
+
+Before that, a button that deletes carries a bin before its label: `DeleteButton`
 (`components/ui/`), over the `trash` glyph; a confirmation whose yes deletes says so with
 `deletes: true` and draws the same.
 

@@ -16,7 +16,8 @@ import {
 } from '@main/dialogs.js';
 import {
   handle,
-  handleFromWindow
+  handleFromWindow,
+  sendTo
 } from '../register.js';
 
 /**
@@ -72,32 +73,17 @@ export function registerDialogHandlers(): void
   // To the owner, same as `repo:openHere`: the file tree meant is the repository
   // window's, not this dialog's own (empty) one.
   handleFromWindow('dialog:showInFileTree', (sender, path) =>
-  {
-    const owner = ownerWindow(sender);
-    if (owner && !owner.isDestroyed())
-    {
-      owner.webContents.send('event:showInFileTree', path);
-    }
-  });
+    sendTo(ownerWindow(sender), 'event:showInFileTree', path)
+  );
   // Same shape again: the `revisions` store this filter is for is the repository
   // window's, not the Advanced Filter dialog's.
   handleFromWindow('dialog:applyLogFilter', (sender, filter) =>
-  {
-    const owner = ownerWindow(sender);
-    if (owner && !owner.isDestroyed())
-    {
-      owner.webContents.send('event:applyLogFilter', filter);
-    }
-  });
+    sendTo(ownerWindow(sender), 'event:applyLogFilter', filter)
+  );
   // And once more: the selection this moves is the grid's, in the window behind this one.
   handleFromWindow('dialog:goToRevision', (sender, sha) =>
-  {
-    const owner = ownerWindow(sender);
-    if (owner && !owner.isDestroyed())
-    {
-      owner.webContents.send('event:goToRevision', sha);
-    }
-  });
+    sendTo(ownerWindow(sender), 'event:goToRevision', sha)
+  );
 
   // Reading the clipboard needs a renderer permission handler and none in main, the whole reason this channel exists.
   handle('clipboard:read', () => clipboard.readText());

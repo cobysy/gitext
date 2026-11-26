@@ -8,6 +8,7 @@ import { openExternalSafely } from './openExternalSafely.js';
 import { join } from 'node:path';
 import { drivenWebPreferences, showWindow } from './background.js';
 import { isMac } from './platform.js';
+import { sendTo } from './sendTo.js';
 
 // Bundled to CommonJS as out/main.
 const dir = __dirname;
@@ -65,13 +66,7 @@ export function createWindow(startPath?: string): BrowserWindow
 
   // Window focus cues re-read working tree: file watcher watches .git only.
   // Sent from here, not DOM event (unreliable).
-  win.on('focus', () =>
-  {
-    if (!win.isDestroyed())
-    {
-      win.webContents.send(EVENT_WINDOW_FOCUS);
-    }
-  });
+  win.on('focus', () => sendTo(win, EVENT_WINDOW_FOCUS, undefined));
 
   // External links open in the real browser, never inside the app.
   win.webContents.setWindowOpenHandler(({ url }) =>

@@ -11,7 +11,8 @@ import { readBlame } from '@main/git/blame.js';
 import { searchGrep } from '@main/git/grep.js';
 import {
   handle,
-  handleFromWindow
+  handleFromWindow,
+  sendTo
 } from '../register.js';
 
 export function registerHistoryHandlers(): void
@@ -20,13 +21,8 @@ export function registerHistoryHandlers(): void
   // that asked, and every other window (a dialog, the console, a second repository) either
   // discards it or, worse, renders it.
   const revisionStream = createRevisionStream((windowId, channel, payload) =>
-  {
-    const win = BrowserWindow.fromId(windowId);
-    if (win && !win.isDestroyed())
-    {
-      win.webContents.send(channel, payload);
-    }
-  });
+    sendTo(BrowserWindow.fromId(windowId), channel, payload)
+  );
 
   // ── Revision log ────────────────────────────────────────────────────────────
   // `handleFromWindow`, because a request id is only unique within one renderer: both

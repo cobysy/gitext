@@ -1,5 +1,5 @@
 ---
-name: ship
+name: land
 description: Commit, push, open a PR, and complete (merge) it for this repo. Use when asked to commit, push, raise a PR, land work, or complete/merge a PR: it carries this repo's branch rules, merge method, ruleset and message style so none of it has to be rediscovered.
 ---
 
