@@ -3,13 +3,17 @@
  *
  * Four ways, and never a fifth: a plain read, a read that must know which window asked,
  * a write that declares what it invalidated, and the broadcast the last of those uses.
+ * Beside them, the two ways a handler pushes an event: `broadcast` to every window, and
+ * `sendTo` (`main/sendTo.ts`) to the one window a read is answering, never a hand-rolled
+ * `webContents.send`.
  * Keeping them here is what stops `ipcMain.handle`'s `any` signature reaching an
  * implementation, and what makes "did this channel say what it changed?" a question with
  * one place to look.
  */
 
 import { BrowserWindow, ipcMain } from 'electron';
-import type { InvokeChannel, Invocations } from '@shared/contract.js';
+import type { EventChannel, Events, InvokeChannel, Invocations } from '@shared/contract.js';
+import { sendTo } from '@main/sendTo.js';
 import type { RepoFacet } from '@shared/invalidation.js';
 import { DIAGNOSTIC_NOTE } from '@shared/types/diagnostics.js';
 import { record } from '@main/diagnostics/index.js';
@@ -47,14 +51,15 @@ export function handleFromWindow<C extends InvokeChannel>(
   );
 }
 
-export function broadcast(channel: string, payload: unknown): void
+/** The one window a read is answering: re-exported so a handler finds every way here. */
+export { sendTo };
+
+/** Push an event to every window, its payload checked against `Events` like `sendTo`'s. */
+export function broadcast<E extends EventChannel>(channel: E, payload: Events[E]): void
 {
   for (const win of BrowserWindow.getAllWindows())
   {
-    if (!win.isDestroyed())
-    {
-      win.webContents.send(channel, payload);
-    }
+    sendTo(win, channel, payload);
   }
 }
 

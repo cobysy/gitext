@@ -24,7 +24,6 @@ import {
 } from '@main/git/facts.js';
 import { readConfigValues, writeConfigValue } from '@main/git/config.js';
 import { listTreeFiles, readBlob } from '@main/git/tree.js';
-import { listStaleBranches } from '@main/git/branchCleanup.js';
 import { deleteIndexLock } from '@main/git/maintenance.js';
 import { runFsck } from '@main/git/fsck.js';
 import { readPatchFile } from '@main/git/patchFile.js';
@@ -41,8 +40,10 @@ import {
   changed,
   handle,
   handleFromWindow,
-  handleWrite
+  handleWrite,
+  sendTo
 } from '../register.js';
+import { scanForCleanup } from '../cleanupScan.js';
 
 export function registerRepoHandlers(): void
 {
@@ -101,13 +102,8 @@ export function registerRepoHandlers(): void
   handle('repo:unwatch', (repoPath) => unwatchRepo(repoPath));
   // To the *owner*: a dialog asking for this means the repository window behind it, the one with a grid.
   handleFromWindow('repo:openHere', (sender, path) =>
-  {
-    const owner = ownerWindow(sender);
-    if (owner && !owner.isDestroyed())
-    {
-      owner.webContents.send('event:openRepo', path);
-    }
-  });
+    sendTo(ownerWindow(sender), 'event:openRepo', path)
+  );
   handle('repo:forgetRecent', (path) => forgetRecentRepo(path).recentRepos);
   handle('repo:openWindow', (path) =>
   {
@@ -137,7 +133,7 @@ export function registerRepoHandlers(): void
   // ── Repository objects ──────────────────────────────────────────────────────
   handle('refs:list', (repoPath) => listRefs(repoPath));
   handle('refs:merged', (repoPath, commit) => listMergedRefs(repoPath, commit));
-  handle('branch:stale', (repoPath, comparison) => listStaleBranches(repoPath, comparison));
+  handleFromWindow('branch:stale', scanForCleanup);
   handle('remote:list', (repoPath) => listRemotes(repoPath));
   handle('stash:list', (repoPath) => listStashes(repoPath));
   handle('worktree:list', (repoPath) => listWorktrees(repoPath));

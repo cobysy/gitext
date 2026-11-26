@@ -12,7 +12,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { listStaleBranches } from '@main/git/branchCleanup.js';
-import { runGit } from '@main/git/runner.js';
+import { listRefs } from '@main/git/refs.js';
+import { REF_KIND_BRANCH, type GitCommandRecord } from '@shared/types.js';
+import { runGit, runnerEvents } from '@main/git/runner.js';
 
 let root = '';
 let repo = '';
@@ -74,10 +76,106 @@ afterAll(async () =>
 
 describe('listStaleBranches', () =>
 {
+  it('judges a branch by the branch, never by a tag of the same name', async () =>
+  {
+    // The tag is on work that did land, squashed: git resolves a bare `release` as the
+    // tag before the branch, and the tag's content is on main.
+    await runGit(repo, ['checkout', '-b', 'release']);
+    await commitFile('release.txt', 'unreleased\n', 'release work');
+    await runGit(repo, ['checkout', 'main']);
+    await runGit(repo, ['tag', 'release', 'squashed-away']);
+    try
+    {
+      const { stale, keptBack } = await listStaleBranches(repo, 'main');
+      expect(stale.map((b) => b.name)).not.toContain('release');
+      expect(keptBack.find((k) => k.name === 'release')?.why).toContain('not on main');
+    }
+    finally
+    {
+      await runGit(repo, ['tag', '-d', 'release']);
+      await runGit(repo, ['branch', '-D', 'release']);
+    }
+  });
+
+  it('judges against the comparison branch, never a tag of the same name', async () =>
+  {
+    // A tag `main` on the first commit: read in place of the branch, nothing after it
+    // would be merged, and the normally-merged branch would be kept back.
+    const first = (await runGit(repo, ['rev-list', '--max-parents=0', 'main'])).trim();
+    await runGit(repo, ['tag', 'main', first]);
+    try
+    {
+      const { stale } = await listStaleBranches(repo, 'main');
+      expect(stale.find((b) => b.name === 'merged-normally')?.reason).toBe('contained');
+      expect(stale.find((b) => b.name === 'squashed-away')?.reason).toBe('squashed');
+    }
+    finally
+    {
+      await runGit(repo, ['tag', '-d', 'main']);
+    }
+  });
+
+  it('stops a squash test between its git calls once the scan is abandoned', async () =>
+  {
+    // Abandoned the moment the first squash test starts: every test in flight must stop
+    // before its next call rather than run its chain of four out.
+    const scan = new AbortController();
+    const commands: string[] = [];
+    function watch(record: GitCommandRecord): void
+    {
+      if (record.cwd !== repo || record.exitCode !== null)
+      {
+        return;
+      }
+      commands.push(record.argv[0]!);
+      if (record.argv[0] === 'merge-base')
+      {
+        scan.abort();
+      }
+    }
+    runnerEvents.on('record', watch);
+    try
+    {
+      await expect(listStaleBranches(repo, 'main', { signal: scan.signal })).rejects.toThrow();
+    }
+    finally
+    {
+      runnerEvents.off('record', watch);
+    }
+    expect(commands).toContain('merge-base');
+    expect(commands).not.toContain('rev-parse');
+    expect(commands).not.toContain('commit-tree');
+    expect(commands).not.toContain('cherry');
+  });
+
   it('offers a normally-merged branch as contained', async () =>
   {
     const { stale } = await listStaleBranches(repo, 'main');
     expect(stale.find((b) => b.name === 'merged-normally')?.reason).toBe('contained');
+  });
+
+  it('reports each local branch as it is judged, counting up to all of them', async () =>
+  {
+    const seen: { checked: number; total: number }[] = [];
+    await listStaleBranches(repo, 'main', { onProgress: (progress) => seen.push(progress) });
+    const locals = (await listRefs(repo)).filter((ref) => ref.kind === REF_KIND_BRANCH);
+    expect(seen.map((p) => p.checked)).toEqual(locals.map((_, index) => index + 1));
+    expect(seen.every((p) => p.total === locals.length)).toBe(true);
+  });
+
+  it('judges nothing once its signal has fired, and rejects', async () =>
+  {
+    // How far a scan gets before stopping is `mapLimited`'s to prove: this fixture has
+    // fewer branches than the scan judges at once, so every one is in flight from the start.
+    const scan = new AbortController();
+    scan.abort();
+    const seen: number[] = [];
+    const answer = listStaleBranches(repo, 'main', {
+      signal: scan.signal,
+      onProgress: ({ checked }) => seen.push(checked)
+    });
+    await expect(answer).rejects.toThrow();
+    expect(seen).toEqual([]);
   });
 
   it('offers a squash-merged branch, which git itself cannot see is merged', async () =>

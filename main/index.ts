@@ -18,6 +18,7 @@ import { installErrorCapture } from './diagnostics/errorCapture.js';
 import { resolveGit } from './git/env.js';
 import { setCommandLogDepth } from './git/runner.js';
 import { registerIpcHandlers } from './ipc/index.js';
+import { sendTo } from './sendTo.js';
 import { installMenu } from './menu.js';
 import { loadSettings, getSettings, pruneRecentRepos } from './settings.js';
 import { closeAllWatchers } from './watcher.js';
@@ -38,10 +39,7 @@ function broadcastTheme(): void
   }
   for (const win of BrowserWindow.getAllWindows())
   {
-    if (!win.isDestroyed())
-    {
-      win.webContents.send(EVENT_THEME, theme);
-    }
+    sendTo(win, EVENT_THEME, theme);
   }
 }
 

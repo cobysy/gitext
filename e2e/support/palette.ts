@@ -26,14 +26,18 @@ function labelPattern(label: string): RegExp
  * from here anyway: the repository window is inert while a modal is up. So this is a bug
  * in the step before, and it says so rather than producing a confusing failure three
  * lines later.
+ *
+ * Waited for first, not read once: a console closes itself a few seconds after a clean
+ * run (a checkout always opens one), so one from the step before may still be counting
+ * down. Only a window still there when the wait runs out is stale.
  */
 async function refuseStaleWindows(app: GitextApp, commandLabel: string): Promise<void>
 {
-  const stale = app.dialogWindows();
-  if (stale.length === 0)
+  if (await app.waitClosed())
   {
     return;
   }
+  const stale = app.dialogWindows();
   const titles = await Promise.all(stale.map((w) => w.title()));
   throw new Error(
     `"${commandLabel}" cannot open: ${titles.join(', ')} still open from the step before`

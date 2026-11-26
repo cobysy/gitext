@@ -10,6 +10,7 @@ import type { MenuItemStates } from '@shared/contract.js';
 import { raiseWindow } from './background.js';
 import { modalChildOf, ownerWindow, repoWindows } from './dialogs.js';
 import { isMac as isMacPlatform } from './platform.js';
+import { sendTo } from './sendTo.js';
 
 /**
  * What each window last reported about its own commands, keyed by its window id. Per
@@ -51,7 +52,7 @@ function send(commandId: string): void
     return;
   }
 
-  win.webContents.send('event:command', commandId);
+  sendTo(win, 'event:command', commandId);
 }
 
 /**

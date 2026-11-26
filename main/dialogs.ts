@@ -27,6 +27,7 @@ import {
   ownerWindow as ownerOf
 } from './dialogs/ownership.js';
 import { isMac } from './platform.js';
+import { sendTo } from './sendTo.js';
 
 export { ownerWindow, repoWindows } from './dialogs/ownership.js';
 
@@ -281,13 +282,7 @@ export function openDialogWindow(
    * A dialog re-reads the working tree on focus, like the repository window: the
    * `.git` watcher misses a file an editor or build wrote, and this is when to ask again.
    */
-  win.on('focus', () =>
-  {
-    if (!win.isDestroyed())
-    {
-      win.webContents.send('event:windowFocus');
-    }
-  });
+  win.on('focus', () => sendTo(win, 'event:windowFocus', undefined));
 
   win.on('close', () => rememberBounds(name, win));
   win.on('closed', () =>

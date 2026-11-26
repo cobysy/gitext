@@ -38,6 +38,25 @@ export interface RefEntry {
   isAnnotated: boolean;
 }
 
+/** A local branch's short name, `feature/x`: what `git branch -d` is given. */
+export type BranchName = string & { readonly __brand: 'BranchName' };
+
+export function toBranchName(name: string): BranchName
+{
+  return name as BranchName;
+}
+
+/**
+ * A ref by its full name, `refs/heads/main`: what git is handed wherever a tag sharing
+ * the short name must not be able to answer for it.
+ */
+export type FullRefName = string & { readonly __brand: 'FullRefName' };
+
+export function toFullRefName(name: string): FullRefName
+{
+  return name as FullRefName;
+}
+
 /**
  * Why a local branch is safe to delete.
  *
@@ -50,8 +69,7 @@ export type StaleBranchReason = 'contained' | 'squashed';
 
 /** A local branch this repository no longer needs, and the evidence for saying so. */
 export interface StaleBranch {
-  /** Short name: what `git branch -d` is given. */
-  name: string;
+  name: BranchName;
   reason: StaleBranchReason;
   /** Tip commit, so the dialog can say exactly what would stop being reachable. */
   sha: string;
@@ -68,14 +86,33 @@ export interface StaleBranch {
   needsForce: boolean;
 }
 
+/** A local branch deliberately not offered, and why: current, worktree, or unmerged. */
+export interface KeptBackBranch {
+  name: BranchName;
+  why: string;
+}
+
 /** The answer to "which branches could I delete", including what was left out: a silent omission is indistinguishable from a miss. */
 export interface BranchCleanupReport {
   /** Branches whose work is provably already on the comparison branch. */
   stale: StaleBranch[];
   /** How many local branches were examined, offered or not. */
   examined: number;
-  /** Names deliberately not offered, each with why: current, worktree, or unmerged. */
-  keptBack: { name: string; why: string }[];
+  /** Branches deliberately not offered, each with why. */
+  keptBack: KeptBackBranch[];
+}
+
+/**
+ * How far a `branch:stale` scan has got: sent as each local branch is judged, since
+ * proving one was squash-merged costs several subprocesses and a scan of hundreds is slow.
+ */
+export interface BranchCleanupProgress {
+  /** The renderer's id for the scan, so an answer to a superseded one can be dropped. */
+  requestId: number;
+  /** Local branches already judged. */
+  checked: number;
+  /** Local branches the scan will judge in all. */
+  total: number;
 }
 
 /** A configured remote. Fetch and push URLs are separate in git and here. */

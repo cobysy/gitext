@@ -45,7 +45,7 @@ interface LogBatchEvent {
  * Revision stream using caller's broadcast (same sender as event:gitCommand/event:repoChanged).
  */
 export function createRevisionStream(
-  send: (windowId: number, channel: string, payload: LogBatchEvent) => void
+  send: (windowId: number, channel: typeof EVENT_LOG_BATCH, payload: LogBatchEvent) => void
 ): RevisionStream
 {
   /** In-flight log reads, keyed by window and the renderer's request id within it. */

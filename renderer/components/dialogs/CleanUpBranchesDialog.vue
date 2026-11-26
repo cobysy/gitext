@@ -6,7 +6,7 @@
  * Merges done on the server only show up after a fetch, so one is offered before the scan.
  */
 
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { api, toMessage } from '@renderer/api.js';
 import { formatRelativeDate } from '@renderer/format.js';
 import { useDialog, type Step } from '@renderer/composables/useDialog.js';
@@ -18,7 +18,7 @@ import {
   PULL_ACTION_FETCH
 } from '@renderer/model/args/index.js';
 import { comparisonOptions, defaultComparison } from '@renderer/model/cleanupComparison.js';
-import type { BranchCleanupReport, StaleBranchReason } from '@shared/types.js';
+import type { BranchCleanupProgress, BranchCleanupReport, StaleBranchReason } from '@shared/types.js';
 import DialogFrame from '@renderer/components/ui/DialogFrame.vue';
 import DeleteButton from '@renderer/components/ui/DeleteButton.vue';
 import FormSelect from '@renderer/components/ui/FormSelect.vue';
@@ -42,6 +42,13 @@ const branches = ref<{ value: string; label: string }[]>([]);
 const report = ref<BranchCleanupReport | null>(null);
 const picked = ref(new Set<string>());
 const scanning = ref(false);
+/** How far the scan in flight has got: null until it reports, and between scans. */
+const progress = ref<BranchCleanupProgress | null>(null);
+/**
+ * The id of the newest scan. Changing the comparison starts one while another may still
+ * be walking, and only the newest one's progress and answer describe the list on screen.
+ */
+let scanRequest = 0;
 const fetching = ref(false);
 /** Set when the fetch failed: the list is then only as fresh as the local refs already were. */
 const staleAfterFetch = ref(false);
@@ -131,25 +138,56 @@ async function scan(): Promise<void>
   {
     return;
   }
+  const requestId = ++scanRequest;
   scanning.value = true;
+  progress.value = null;
   error.value = '';
   // Never carry a tick across a rescan: the list it referred to is gone, and a name that
   // survives into a different comparison would be selected without having been looked at.
   picked.value = new Set();
+  let answer: BranchCleanupReport | null = null;
+  let failure = '';
   try
   {
-    report.value = await api['branch:stale'](props.repoPath, comparison.value);
+    answer = await api['branch:stale'](requestId, props.repoPath, comparison.value);
   }
   catch (e)
   {
-    error.value = toMessage(e);
-    report.value = null;
+    failure = toMessage(e);
   }
-  finally
+  // A newer scan has started: this answer describes nothing on screen. `null` says the
+  // same from main's side, an abandoned scan, and is never "nothing to clean up".
+  if (requestId !== scanRequest || (answer === null && !failure))
   {
-    scanning.value = false;
+    return;
+  }
+  report.value = answer;
+  error.value = failure;
+  progress.value = null;
+  scanning.value = false;
+}
+
+function onProgress(next: BranchCleanupProgress): void
+{
+  if (next.requestId === scanRequest)
+  {
+    progress.value = next;
   }
 }
+
+/** The waiting line: how many branches are done, once the scan has said. */
+const scanningLine = computed(() =>
+{
+  const now = progress.value;
+  if (!now)
+  {
+    return 'Checking every local branch…';
+  }
+  return `Checking every local branch · ${now.checked} of ${now.total}`;
+});
+
+const stopProgress = api.on('event:cleanupProgress', onProgress);
+onUnmounted(stopProgress);
 
 async function run(): Promise<void>
 {
@@ -251,7 +289,7 @@ watch(comparison, scan);
       />
 
       <p v-if="fetching" class="placeholder">Fetching from the remotes…</p>
-      <p v-else-if="scanning" class="placeholder">Checking every local branch…</p>
+      <p v-else-if="scanning" class="placeholder">{{ scanningLine }}</p>
 
       <template v-else>
         <p v-if="staleAfterFetch" class="warn">
